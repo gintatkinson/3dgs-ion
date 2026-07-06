@@ -9,6 +9,9 @@
     "skills/spec-user-story-engineering",
     "skills/spec-usecase-engineering",
     "skills/feature-driven-implementation",
-    "skills/project-constitution"
+    "skills/project-constitution",
+    "skills/debug-protocol",
+    "skills/adversarial-code-auditor",
+    "skills/spec-implementation-auditor"
   ]
 }

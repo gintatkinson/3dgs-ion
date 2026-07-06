@@ -10,7 +10,7 @@ if(APPLE)
 endif()
 
 option(BUILD_SHARED_LIBS "Build shared libraries" ON)
-option(CESIUM_DISABLE_CURL "Disable libcurl (use cesium-native's STB fallback)" ON)
+option(CESIUM_DISABLE_CURL "Disable libcurl (use cesium-native's STB fallback)" OFF)
 
 set(CESIUM_NATIVE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../third_party/cesium-native")
 
