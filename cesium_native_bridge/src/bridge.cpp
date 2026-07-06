@@ -32,15 +32,21 @@ bridge_handle_t bridge_initialize(
 
   if (!config) return BRIDGE_ERR_INIT;
 
-  std::lock_guard<std::mutex> lock(g_statesMutex);
-  bridge_handle_t handle = g_nextHandle++;
+  try {
+    std::lock_guard<std::mutex> lock(g_statesMutex);
+    bridge_handle_t handle = g_nextHandle++;
 
-  auto state = std::make_unique<BridgeState>();
-  state->errorCallback = on_error;
-  state->errorUserData = user_data;
+    auto state = std::make_unique<BridgeState>();
+    state->errorCallback = on_error;
+    state->errorUserData = user_data;
 
-  g_states[handle] = std::move(state);
-  return handle;
+    g_states[handle] = std::move(state);
+    return handle;
+  } catch (const std::exception&) {
+    return BRIDGE_ERR_MEMORY;
+  } catch (...) {
+    return BRIDGE_ERR_FATAL;
+  }
 }
 
 void bridge_shutdown(bridge_handle_t handle) {
