@@ -1321,17 +1321,20 @@ class Scene3DViewportPainter extends CustomPainter {
 
     // 5. Draw Grid lines (Meridians & Parallels) - front hemisphere only
     _gridPaint.color = gridColor;
+    const double earthRadius = 6378137.0;
 
     const int numMeridians = 12;
     const int meridianSteps = 30;
+    final double meridianLngStep = 2 * math.pi / numMeridians;
+    final double meridianLatStep = math.pi / meridianSteps;
     for (int i = 0; i < numMeridians; i++) {
-      final double lng = i * (2 * math.pi / numMeridians);
+      final double lng = i * meridianLngStep;
       for (int j = 0; j < meridianSteps; j++) {
-        final double lat1 = -math.pi / 2 + j * (math.pi / meridianSteps);
-        final double lat2 = -math.pi / 2 + (j + 1) * (math.pi / meridianSteps);
+        final double lat1 = -math.pi / 2 + j * meridianLatStep;
+        final double lat2 = -math.pi / 2 + (j + 1) * meridianLatStep;
         
-        final ProjectedPoint p1 = project(lat1, lng, 6378137.0, center, rotationAngle, tilt, size);
-        final ProjectedPoint p2 = project(lat2, lng, 6378137.0, center, rotationAngle, tilt, size);
+        final ProjectedPoint p1 = project(lat1, lng, earthRadius, center, rotationAngle, tilt, size);
+        final ProjectedPoint p2 = project(lat2, lng, earthRadius, center, rotationAngle, tilt, size);
         
         if (p1.z >= 0 && p2.z >= 0) {
           canvas.drawLine(p1.offset, p2.offset, _gridPaint);
@@ -1341,14 +1344,16 @@ class Scene3DViewportPainter extends CustomPainter {
 
     const int numParallels = 6;
     const int parallelSteps = 60;
+    final double parallelLngStep = 2 * math.pi / parallelSteps;
+    final double parallelLatStep = math.pi / (numParallels + 1);
     for (int i = 0; i < numParallels; i++) {
-      final double lat = -math.pi / 2 + (i + 1) * (math.pi / (numParallels + 1));
+      final double lat = -math.pi / 2 + (i + 1) * parallelLatStep;
       for (int j = 0; j < parallelSteps; j++) {
-        final double lng1 = j * (2 * math.pi / parallelSteps);
-        final double lng2 = (j + 1) * (2 * math.pi / parallelSteps);
+        final double lng1 = j * parallelLngStep;
+        final double lng2 = (j + 1) * parallelLngStep;
         
-        final ProjectedPoint p1 = project(lat, lng1, 6378137.0, center, rotationAngle, tilt, size);
-        final ProjectedPoint p2 = project(lat, lng2, 6378137.0, center, rotationAngle, tilt, size);
+        final ProjectedPoint p1 = project(lat, lng1, earthRadius, center, rotationAngle, tilt, size);
+        final ProjectedPoint p2 = project(lat, lng2, earthRadius, center, rotationAngle, tilt, size);
         
         if (p1.z >= 0 && p2.z >= 0) {
           canvas.drawLine(p1.offset, p2.offset, _gridPaint);

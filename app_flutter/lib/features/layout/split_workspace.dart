@@ -167,8 +167,8 @@ class _SplitWorkspaceState extends State<SplitWorkspace> {
         );
 
         final leadingPane = isHorizontal
-            ? SizedBox(width: clampedFirstPane, child: RepaintBoundary(child: widget.leading))
-            : SizedBox(height: clampedFirstPane, child: RepaintBoundary(child: widget.leading));
+            ? SizedBox(width: clampedFirstPane, child: RepaintBoundary(key: ValueKey('leading_${clampedFirstPane.round()}'), child: widget.leading))
+            : SizedBox(height: clampedFirstPane, child: RepaintBoundary(key: ValueKey('leading_${clampedFirstPane.round()}'), child: widget.leading));
 
         final trailingPane = RepaintBoundary(child: widget.trailing);
 

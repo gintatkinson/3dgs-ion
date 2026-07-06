@@ -143,6 +143,11 @@ class _LayoutState extends State<Layout> {
   /// Checks [path] and `../$path` for the file; returns an empty map if
   /// neither exists or parsing fails. Caches `codebase_rules` and `labels`
   /// files separately so repeated calls avoid I/O.
+  ///
+  /// @deprecated Prefer [_preloadConfigs] which loads asynchronously on a
+  /// background isolate to avoid blocking the UI thread. This method uses
+  /// synchronous I/O existSync/readAsStringSync and is retained only as a
+  /// fallback path.
   Map<String, dynamic> _loadJsonOnce(String path) {
     if (_cachedRules != null && path.contains('codebase_rules')) return _cachedRules!;
     if (_cachedLabels != null && path.contains('labels')) return _cachedLabels!;

@@ -1,7 +1,18 @@
-final _coordinateMappingCache = Expando<Map<String, String>>();
-final _labelsMappingCache = Expando<Map<String, String>>();
+var _coordinateMappingCache = Expando<Map<String, String>>();
+var _labelsMappingCache = Expando<Map<String, String>>();
+
+void clearLayoutConfigCaches() {
+  _coordinateMappingCache = Expando<Map<String, String>>();
+  _labelsMappingCache = Expando<Map<String, String>>();
+  _defaultRatioMemo.clear();
+}
+
+final _defaultRatioMemo = <({int configHash, String key}), double>{};
 
 double getDefaultRatio(Map<String, dynamic> layoutConfig, String key, double fallback) {
+  final memoKey = (configHash: identityHashCode(layoutConfig), key: key);
+  final cached = _defaultRatioMemo[memoKey];
+  if (cached != null) return cached;
   try {
     final parts = key.split('.');
     dynamic current = layoutConfig;
@@ -9,11 +20,17 @@ double getDefaultRatio(Map<String, dynamic> layoutConfig, String key, double fal
       if (current is Map<String, dynamic> && current.containsKey(part)) {
         current = current[part];
       } else {
+        _defaultRatioMemo[memoKey] = fallback;
         return fallback;
       }
     }
-    if (current is num) return current.toDouble();
+    if (current is num) {
+      final result = current.toDouble();
+      _defaultRatioMemo[memoKey] = result;
+      return result;
+    }
   } catch (_) {}
+  _defaultRatioMemo[memoKey] = fallback;
   return fallback;
 }
 
