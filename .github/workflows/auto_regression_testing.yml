@@ -1,0 +1,44 @@
+name: Auto Regression Testing
+
+on:
+  issues:
+    types: [opened, labeled]
+  pull_request:
+  push:
+    branches: [ master ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pyyaml
+          pip install -e skills/spec-orchestrator/parity_auditor
+
+      - name: Run Ingest and Verify Reproduction (Issues Only)
+        if: github.event_name == 'issues' && (contains(github.event.issue.labels.*.name, 'bug') || contains(github.event.issue.labels.*.name, 'feature'))
+        env:
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          python scripts/ingest_issue.py
+          if [ -d "tests/repro_cases/${{ github.event.issue.number }}" ]; then
+            python -m parity_auditor.cli --spec-only tests/repro_cases/${{ github.event.issue.number }}/docs/schemas tests/repro_cases/${{ github.event.issue.number }}/docs/features && exit 1 || exit 0
+          else
+            echo "No reproduction directory found. Skipping validation."
+          fi
+
+      - name: Run Existing Regression Tests (PR / Push)
+        if: github.event_name != 'issues'
+        run: |
+          pytest tests/test_repro_cases.py

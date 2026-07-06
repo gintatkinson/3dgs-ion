@@ -1,0 +1,35 @@
+{
+  "_copyright": "Copyright Gint Atkinson, gint.atkinson@gmail.com",
+  "criteria": [
+    {
+      "name": "no_platform_in_frontmatter",
+      "description": "Feature YAML frontmatter does not contain a 'platform' field",
+      "weight": 2
+    },
+    {
+      "name": "no_framework_references",
+      "description": "Feature body contains no framework-specific component names (React, Flutter, Drawer, BottomSheet, etc.)",
+      "weight": 3
+    },
+    {
+      "name": "interface_requirements",
+      "description": "Feature includes an 'Interface Requirements' section describing data and layout logically without framework references",
+      "weight": 2
+    },
+    {
+      "name": "acceptance_criteria_independent",
+      "description": "Given-When-Then acceptance criteria use functional language, not framework-specific language",
+      "weight": 2
+    },
+    {
+      "name": "exhaustive_constraints",
+      "description": "Every schema node's type, units, defaults, when/must clauses are documented — no constraint detail lost",
+      "weight": 2
+    },
+    {
+      "name": "source_references",
+      "description": "Each feature file includes Source References with links to structural schema and normative text",
+      "weight": 1
+    }
+  ]
+}

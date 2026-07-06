@@ -1,0 +1,40 @@
+{
+  "_copyright": "Copyright Gint Atkinson, gint.atkinson@gmail.com",
+  "criteria": [
+    {
+      "name": "constitution_read",
+      "description": "Agent reads the project constitution and implementation profile before starting work",
+      "weight": 1
+    },
+    {
+      "name": "failing_test_first",
+      "description": "Agent writes a failing test before writing implementation code for each micro-task",
+      "weight": 3
+    },
+    {
+      "name": "test_failure_verified",
+      "description": "Agent runs the test and confirms it fails (RED phase) before writing implementation",
+      "weight": 2
+    },
+    {
+      "name": "raw_proof_provided",
+      "description": "Agent provides raw terminal output as proof of test results, not just assertions like 'tests pass'",
+      "weight": 3
+    },
+    {
+      "name": "serial_execution",
+      "description": "Agent does not attempt to start another feature before completing this one",
+      "weight": 1
+    },
+    {
+      "name": "solution_walkthrough",
+      "description": "Agent creates a cumulative solution walkthrough document with verification evidence",
+      "weight": 1
+    },
+    {
+      "name": "issue_closure",
+      "description": "Agent closes the GitHub issue with a traceability comment linking to the solution walkthrough",
+      "weight": 1
+    }
+  ]
+}

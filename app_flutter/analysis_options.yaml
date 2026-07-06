@@ -1,0 +1,12 @@
+analyzer:
+  language:
+    strict-casts: true
+    strict-inference: true
+    strict-raw-types: true
+  exclude:
+    - "build/**"
+
+linter:
+  rules:
+    - always_document
+    - public_member_api_docs

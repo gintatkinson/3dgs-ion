@@ -1,0 +1,33 @@
+[
+  {
+    "name": "High-Frequency Stream Data Trigger",
+    "trigger_nodes": [
+      "stream-data",
+      "real-time-stream",
+      "high-frequency-data",
+      "sensor-stream",
+      "telemetry-data"
+    ],
+    "rules": [
+      {
+        "target_type": "user-story",
+        "requires_mermaid_block": "sequenceDiagram",
+        "match_terms_in_mermaid": [
+          "OffThreadHandler",
+          "ConcurrencyGuard",
+          "StateLock"
+        ],
+        "error_message": "User Story diagrams must illustrate off-thread computations (OffThreadHandler) and concurrency control implementations (ConcurrencyGuard/StateLock) when high-frequency data streams are present in the schema."
+      },
+      {
+        "target_type": "use-case",
+        "match_terms_in_body": [
+          "temporal-context",
+          "playback",
+          "state-transitions"
+        ],
+        "error_message": "Use Cases must detail the temporal context state machine (playback controls and state transitions) when high-frequency stream data is configured in the schema."
+      }
+    ]
+  }
+]

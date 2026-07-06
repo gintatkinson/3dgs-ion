@@ -1,0 +1,45 @@
+{
+  "_copyright": "Copyright Gint Atkinson, gint.atkinson@gmail.com",
+  "criteria": [
+    {
+      "name": "epic_creation",
+      "description": "At least one Epic markdown file is created in docs/epics/ with correct YAML frontmatter",
+      "weight": 1
+    },
+    {
+      "name": "feature_extraction",
+      "description": "Feature files are created in docs/features/ with exhaustive Given-When-Then acceptance criteria and no platform-specific references",
+      "weight": 2
+    },
+    {
+      "name": "user_story_extraction",
+      "description": "User Story files are created in docs/user-stories/ with BDD scenarios and a Required Features Matrix linking to GitHub Issue IDs",
+      "weight": 2
+    },
+    {
+      "name": "use_case_extraction",
+      "description": "Use Case files are created in docs/use-cases/ with Actors, Preconditions, Main Success Scenario, and Realization Matrix",
+      "weight": 2
+    },
+    {
+      "name": "github_instrumentation",
+      "description": "GitHub issues are created with correct labels (epic, feature, user-story, use-case) and cross-referenced via Issue IDs",
+      "weight": 2
+    },
+    {
+      "name": "source_references",
+      "description": "Every generated markdown file includes a Source References section with links to the structural schema and normative text",
+      "weight": 1
+    },
+    {
+      "name": "platform_independence",
+      "description": "Feature specs contain no platform-specific references (no framework names, no UI component names). They are purely functional",
+      "weight": 1
+    },
+    {
+      "name": "duplicate_detection",
+      "description": "Re-running the pipeline does not create duplicate GitHub issues",
+      "weight": 1
+    }
+  ]
+}

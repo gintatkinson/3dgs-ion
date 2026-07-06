@@ -1,0 +1,15 @@
+# Copyright Gint Atkinson, gint.atkinson@gmail.com
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store
+.tessl/
+scratch/
+
+# Credentials & local env configuration
+.env
+.env.local
+.env.*
+*define*.json
+config.json
+benchmark_results.jsonl

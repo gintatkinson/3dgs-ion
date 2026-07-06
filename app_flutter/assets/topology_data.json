@@ -1,0 +1,33 @@
+{
+  "coordinate_mapping": {
+    "x": "position/dim_0",
+    "y": "position/dim_1",
+    "z": "position/dim_2",
+    "t": "position/time_index",
+    "trajectory": "position/vector"
+  },
+  "nodes": [
+    {
+      "id": "Alpha",
+      "label": "Alpha Node",
+      "position": { "dim_0": 100, "dim_1": 140, "dim_2": 0.0, "time_index": 1.0, "vector": [15, 3, 0.0] },
+      "status": "Active"
+    },
+    {
+      "id": "Beta",
+      "label": "Beta Node",
+      "position": { "dim_0": 320, "dim_1": 90, "dim_2": 0.0, "time_index": 1.0, "vector": [8, -4, 0.0] },
+      "status": "Active"
+    },
+    {
+      "id": "Gamma",
+      "label": "Gamma Node",
+      "position": { "dim_0": 240, "dim_1": 220, "dim_2": 0.0, "time_index": 1.0, "vector": [4, 10, 0.0] },
+      "status": "Idle"
+    }
+  ],
+  "links": [
+    { "source": "Alpha", "target": "Beta", "type": "data-flow" },
+    { "source": "Beta", "target": "Gamma", "type": "data-flow" }
+  ]
+}

@@ -1,0 +1,159 @@
+{
+  "meta": {
+    "version": "1.0.0",
+    "schema_name": "systems_topology_dashboard"
+  },
+  "theme": {
+    "modes": [
+      "light",
+      "dark",
+      "system"
+    ],
+    "colors": {
+      "primary_accent": "color.brand.primary",
+      "background": {
+        "light": "color.background.light",
+        "dark": "color.background.dark"
+      },
+      "surface": {
+        "light": "color.surface.light",
+        "dark": "color.surface.dark"
+      }
+    },
+    "typography": {
+      "fonts": [
+        "token.font.primary",
+        "token.font.secondary",
+        "system-ui"
+      ],
+      "scale": "high-density"
+    }
+  },
+  "navigation": {
+    "sidebar": {
+      "collapsible": true,
+      "default_expanded": true,
+      "items": "token:navigation.sidebar.items"
+    }
+  },
+  "layout": {
+    "root_container": {
+      "type": "SidebarLayout",
+      "id": "main_shell",
+      "children": [
+        {
+          "type": "HierarchyTreeSelector",
+          "id": "resource_tree",
+          "props": {
+            "width": "spacing.layout-sidebar-width",
+              "hierarchy": [
+                {
+                  "id": "CategoryA",
+                  "label": "Category A",
+                  "children": [
+                    { "id": "ItemA1", "label": "Item A1" },
+                    { "id": "ItemA2", "label": "Item A2" }
+                  ]
+                },
+                {
+                  "id": "CategoryB",
+                  "label": "Category B",
+                  "children": [
+                    { "id": "ItemB1", "label": "Item B1" }
+                  ]
+                }
+              ]
+          },
+          "bindings": {
+            "data_source": "token:layout.data_sources.resource_tree",
+            "selection_target": "selected_managed_object"
+          }
+        },
+        {
+          "type": "SplitWorkspace",
+          "id": "workspace_split",
+          "props": {
+            "axis": "vertical",
+            "resizable": true,
+            "default_ratio": "token:layout_properties.default_ratio",
+            "reconfigurable": true,
+            "min_size_pixels": "spacing.layout-min-pane-size"
+          },
+          "children": [
+            {
+              "type": "TopographicalView",
+              "id": "topology_pane",
+              "props": {
+                "dimensions": "token:layout_properties.dimensions",
+                "enable_time_playback": true,
+                "interactive": true,
+                "allow_pan_zoom": true
+              },
+              "bindings": {
+                "data_source": "token:layout.data_sources.topology",
+                "selection_target": "active_focused_node",
+                "coordinate_mapping": "token:layout.coordinate_mapping",
+                "depth_selector": {
+                  "default_hops": "token:layout_properties.default_hops",
+                  "max_hops": "token:layout_properties.max_hops"
+                },
+                "relationship_filters": "token:layout_properties.relationship_filters"
+              }
+            },
+            {
+              "type": "TabbedContainer",
+              "id": "details_and_relations_tab",
+              "props": {
+                "tab_position": "bottom"
+              },
+              "children": [
+                {
+                  "type": "TableView",
+                  "id": "components_table",
+                  "props": {
+                    "label": "token:layout.labels.components",
+                    "sortable": true,
+                    "filterable": true,
+                    "high_density": true,
+                    "display_all_attributes": true
+                  },
+                  "bindings": {
+                    "data_source": "token:layout.data_sources.components"
+                  }
+                },
+                {
+                  "type": "TableView",
+                  "id": "relation_a_table",
+                  "props": {
+                    "label": "token:layout.labels.relation_a",
+                    "sortable": true,
+                    "filterable": true,
+                    "high_density": true,
+                    "display_all_attributes": true
+                  },
+                  "bindings": {
+                    "data_source": "token:layout.data_sources.relation_a"
+                  }
+                },
+                {
+                  "type": "TableView",
+                  "id": "relation_b_table",
+                  "props": {
+                    "label": "token:layout.labels.relation_b",
+                    "sortable": true,
+                    "filterable": true,
+                    "high_density": true,
+                    "display_all_attributes": true
+                  },
+                  "bindings": {
+                    "data_source": "token:layout.data_sources.relation_b"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

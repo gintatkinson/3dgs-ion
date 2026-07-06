@@ -1,0 +1,235 @@
+{
+  "meta": {
+    "version": "1.0.0",
+    "description": "Dynamic verification rules and parameters for pipeline and codebase compliance",
+    "upstream_repository": "gintatkinson/digital-pipeline-repo",
+    "troubleshooting_instruction": "If you believe this failure is due to a bug in the pipeline tooling, please report it to: {upstream_repo}",
+    "constitution_path": ".pipeline/constitution.md",
+    "profiles_directory": ".pipeline/profiles",
+    "walkthrough_directory": "docs/designs",
+    "walkthrough_pattern": "feat-{number}-solution.md",
+    "reconciliation_script_path": "skills/spec-orchestrator/scripts/reconcile_backlog.py",
+    "behavioral_triggers_path": "rules/behavioral_triggers.json"
+  },
+  "tracker_rules": {
+    "provider": "github",
+    "issue_id_placeholder": "#[IssueID]",
+    "prefix_normalization_regex": "^(epic|feature|feat|user[- ]story|use[- ]case|us|uc)[s]?(?:[- ]*\\d+\\s*[:\\-]?|:)\\s*",
+    "title_extraction_prefixes_regex": "(?:Feature\\s+\\d+\\s*:\\s*|Use\\s+Case\\s+\\d+\\s*:\\s*|User\\s+Story\\s+\\d+\\s*:\\s*)?",
+    "truncation_headers": ["## Acceptance Criteria", "## User Stories"],
+    "truncation_message_template": "\n\n---\n*Warning: This issue body has been truncated because it exceeds the tracker size limit of {max_body_chars} characters.*\n*Please refer to the full specification file in the repository at `{rel_path}` for the complete details.*\n",
+    "numeric_prefix": "#",
+    "alphanumeric_prefix": "",
+    "keys": {
+      "issue_id": "number",
+      "title": "title",
+      "labels": "labels",
+      "state": "state",
+      "closed_state_value": "CLOSED",
+      "open_state_value": "OPEN"
+    },
+    "labels": {
+      "epic": "epic",
+      "feature": "feature",
+      "user_story": "user-story",
+      "use_case": "use-case"
+    },
+    "commands": {
+      "list_issues": ["gh", "issue", "list", "--limit", "1000", "--state", "all", "--json", "number,title,state,labels"],
+      "edit_issue": ["gh", "issue", "edit", "{number}", "--body-file", "{temp_path}"],
+      "close_issue": ["gh", "issue", "close", "{number}", "--comment", "{comment}"]
+    }
+  },
+  "backlog_directories": {
+    "epics": "docs/epics",
+    "features": "docs/features",
+    "user_stories": "docs/user-stories",
+    "use_cases": "docs/use-cases",
+    "schemas": "schema"
+  },
+  "target_directories": {
+    "flutter": "app_flutter"
+  },
+  "flutter_rules": {
+    "file_extensions": [".dart"],
+    "exclusions": ["build", ".dart_tool", ".git"],
+    "ui_directories": ["widgets", "screens"],
+    "network_directories": ["io"],
+    "selection_setters": ["set selected", "set active", "set selection", "setSelectedNode", "setActiveNode"],
+    "selection_triggers": ["onChanged", "onSelected", "notifyListeners", "dispatch"],
+    "loop_guard_keywords": ["userinitiated", "programmatic", "fromuser", "isuser", "userinteraction"],
+    "forbidden_words": [],
+    "forbidden_words_message": "UI widget/screen but references forbidden libraries directly. Calculations must run exclusively in a background Isolate.",
+    "write_lock_keywords": ["writelock", "lockwrite", "sendlock", "mutationlock"],
+    "playhead_clamp_regex": ["0\\.9\\b", "1\\.1\\b"],
+    "ffi_keywords": ["dart:ffi"],
+    "ffi_finalizer_keywords": ["nativefinalizer"],
+    "ffi_refcount_keywords": ["refcount", "referencecount", "addref", "release", "finalizer"],
+    "viewport_file_patterns": ["viewport"],
+    "network_file_patterns": ["gateway", "socket", "client", "connection"]
+  },
+  "python_rules": {
+    "exclusions": ["node_modules", "build", "dist", "coverage", ".git", "skills", ".tessl-plugin"]
+  },
+  "spec_rules": {
+    "dom_leak_patterns": ["\\baria-\\w+", "\\brole=[\"']\\w+"],
+    "pixel_leak_patterns": ["\\b\\d+px\\b"],
+    "spec_files": [".pipeline/logical-ui/logical-components.md"],
+    "design_tokens_path": ".pipeline/logical-ui/design-tokens.json",
+    "forbidden_standards_blocklist": ["X.733", "ITU-T", "3GPP", "RFC 8345"]
+  },
+  "validation_rules": {
+    "uml_primitives": ["String", "Integer", "Real", "Boolean", "Decimal64"],
+    "visibility_prefixes": ["+", "-", "#", "~"],
+    "playhead_rate_limits": [0.90, 1.10],
+    "relationship_connectors": "(\\*--|o--|<\\|--|--|-->)",
+    "choice_stereotypes": ["<<choice>>"],
+    "sequence_replies": ["-->"],
+    "fragment_keywords": ["alt", "loop", "opt", "par", "critical", "else", "option"],
+    "use_case_flow_limit": 2,
+    "use_case_step_limit": 2,
+    "max_body_characters": 65536,
+    "schema_exclude_keywords": ["description", "reference", "organization", "contact", "revision", "import", "prefix", "namespace", "yang-version"],
+    "multiplicity_regex": "\\[[^\\]]+\\]",
+    "essential_feature_sections": ["Class Diagram", "Interface Requirements"],
+    "required_diagrams": {
+      "epic": ["classDiagram", "stateDiagram-v2"],
+      "feature": ["classDiagram"],
+      "user_story": ["sequenceDiagram"],
+      "use_case": ["(?:graph|flowchart)", "stateDiagram"]
+    },
+    "mermaid_dotted_link_regex": "-\\.-*->\\s*\\|",
+    "forbidden_diagram_types": ["erDiagram"],
+    "use_case_stadium_nodes_only": true,
+    "use_case_undirected_actor_links_only": true,
+    "use_case_extend_arrow_direction_check": true,
+    "naming_conventions": {
+      "use_case": "^uc-\\d{2}-[a-z0-9\\-]+\\.md$"
+    },
+    "test_data_shape_regex": "###\\s+1\\.\\s+Test\\s+Data\\s+Shape",
+    "test_data_block_regex": "```json",
+    "bdd_scenario_regexes": [
+      "(?:Given|When|Then)",
+      "As a\\s+.*\\s+I want to\\s+.*\\s+so that\\s+.*"
+    ],
+    "required_features_matrix_regex": "##\\s+Required\\s+Features(?:\\s+Matrix)?(.*?)(?=##|\\Z)",
+    "checkbox_syntax_regex": "-\\s+\\[[ xX]\\]\\s+.*",
+    "use_case_alternate_flows_header": "## 5. Alternate and Exception Flows",
+    "use_case_numbered_step_regex": "\\b\\d+\\.\\s+\\S+",
+    "use_case_flow_list_regex": "(?:-|\\*)\\s+\\*\\*\\d+[a-zA-Z]+\\..*?(?=(?:\\n\\s*(?:-|\\*)\\s+\\*\\*\\d+[a-zA-Z]+\\.)|\\Z)",
+    "realization_matrix_header": "## 8. Realization Matrix",
+    "realization_stories_header": "### Required User Stories",
+    "realization_features_header": "### Required Features",
+    "schema_patterns": {
+      ".yang": {
+        "name_regex": "\\bmodule\\s+([a-zA-Z0-9_\\-]+)",
+        "patterns": [
+          "\\btypedef\\s+([a-zA-Z0-9_\\-]+)",
+          "\\bleaf\\s+([a-zA-Z0-9_\\-]+)",
+          "\\bleaf-list\\s+([a-zA-Z0-9_\\-]+)",
+          "\\bcontainer\\s+([a-zA-Z0-9_\\-]+)",
+          "\\blist\\s+([a-zA-Z0-9_\\-]+)",
+          "\\bgrouping\\s+([a-zA-Z0-9_\\-]+)",
+          "\\bchoice\\s+([a-zA-Z0-9_\\-]+)",
+          "\\bcase\\s+([a-zA-Z0-9_\\-]+)",
+          "\\bidentity\\s+([a-zA-Z0-9_\\-]+)",
+          "\\banydata\\s+([a-zA-Z0-9_\\-]+)",
+          "\\banyxml\\s+([a-zA-Z0-9_\\-]+)",
+          "\\brpc\\s+([a-zA-Z0-9_\\-]+)",
+          "\\bnotification\\s+([a-zA-Z0-9_\\-]+)",
+          "\\baction\\s+([a-zA-Z0-9_\\-]+)"
+        ]
+      }
+    },
+    "alternative_schema_extensions": [".yaml", ".yml", ".json", ".proto", ".asn", ".asn1", ".msg", ".srv", ".xsd"],
+    "required_sections": {
+      "epic": [
+        ["##\\s+1\\.\\s+Context", "## 1. Context"],
+        ["##\\s+2\\.\\s+Requirements\\s+&\\s+Checklist", "## 2. Requirements & Checklist"],
+        ["##\\s+3\\.\\s+Architecture", "## 3. Architecture"],
+        ["##\\s+4\\.\\s+Operational\\s+Considerations", "## 4. Operational Considerations"],
+        ["##\\s+5\\.\\s+Security\\s+&\\s+Governance", "## 5. Security & Governance"],
+        ["##\\s+6\\.\\s+Source\\s+References", "## 6. Source References"],
+        ["##\\s+System-Level\\s+UML\\s+Class\\s+Diagram", "## System-Level UML Class Diagram"],
+        ["##\\s+System\\s+State\\s+Machine\\s+Diagram", "## System State Machine Diagram"]
+      ],
+      "feature": [
+        ["##\\s+UML\\s+Class\\s+Diagram", "## UML Class Diagram"],
+        ["##\\s+Interface\\s+Requirements", "## Interface Requirements"],
+        ["###\\s+1\\.\\s+Test\\s+Data\\s+Shape", "### 1. Test Data Shape"],
+        ["###\\s+4\\.\\s+Interactive\\s+Flow\\s+&\\s+States", "### 4. Interactive Flow & States"]
+      ],
+      "feature_ui": [
+        ["##\\s+UML\\s+Class\\s+Diagram", "## UML Class Diagram"],
+        ["##\\s+Interface\\s+Requirements", "## Interface Requirements"],
+        ["###\\s+1\\.\\s+Test\\s+Data\\s+Shape", "### 1. Test Data Shape"],
+        ["###\\s+3\\.\\s+Visual\\s+Layout\\s+&\\s+Arrangement", "### 3. Visual Layout & Arrangement"],
+        ["###\\s+4\\.\\s+Interactive\\s+Flow\\s+&\\s+States", "### 4. Interactive Flow & States"]
+      ],
+      "feature_api": [
+        ["##\\s+UML\\s+Class\\s+Diagram", "## UML Class Diagram"],
+        ["##\\s+Interface\\s+Requirements", "## Interface Requirements"],
+        ["###\\s+1\\.\\s+Payload\\s+Schema", "### 1. Payload Schema"],
+        ["###\\s+3\\.\\s+Logical\\s+Operations\\s+&\\s+Interface\\s+Messages", "### 3. Logical Operations & Interface Messages"],
+        ["###\\s+4\\.\\s+Logical\\s+Exception\\s+States\\s+&\\s+Validation\\s+Failures", "### 4. Logical Exception States & Validation Failures"]
+      ],
+      "feature_m2m": [
+        ["##\\s+UML\\s+Class\\s+Diagram", "## UML Class Diagram"],
+        ["##\\s+Interface\\s+Requirements", "## Interface Requirements"],
+        ["###\\s+1\\.\\s+Payload\\s+Schema", "### 1. Payload Schema"],
+        ["###\\s+3\\.\\s+Logical\\s+Operations\\s+&\\s+Interface\\s+Messages", "### 3. Logical Operations & Interface Messages"],
+        ["###\\s+4\\.\\s+Logical\\s+Exception\\s+States\\s+&\\s+Validation\\s+Failures", "### 4. Logical Exception States & Validation Failures"]
+      ],
+      "user_story": [
+        ["##\\s+UML\\s+Sequence\\s+Diagram", "## UML Sequence Diagram"],
+        ["##\\s+Required\\s+Features", "## Required Features"]
+      ],
+      "use_case": [
+        ["##\\s+UML\\s+Diagrams", "## UML Diagrams"],
+        ["##\\s+1\\.\\s+Actors", "## 1. Actors"],
+        ["##\\s+2\\.\\s+Preconditions", "## 2. Preconditions"],
+        ["##\\s+3\\.\\s+Trigger", "## 3. Trigger"],
+        ["##\\s+4\\.\\s+Main\\s+Success\\s+Scenario", "## 4. Main Success Scenario"],
+        ["##\\s+5\\.\\s+Alternate\\s+(?:and|&)\\s+Exception\\s+Flows", "## 5. Alternate and Exception Flows"],
+        ["##\\s+6\\.\\s+Postconditions", "## 6. Postconditions"],
+        ["##\\s+8\\.\\s+Realization\\s+Matrix", "## 8. Realization Matrix"]
+      ]
+    }
+  },
+  "navigation": {
+    "sidebar": {
+      "items": [
+        { "label": "Main Dashboard", "route": "/dashboard", "icon": "dashboard" }
+      ]
+    }
+  },
+  "layout_properties": {
+    "default_ratio": 0.5,
+    "dimensions": 2,
+    "default_hops": 1,
+    "max_hops": 3,
+    "relationship_filters": ["parent", "child", "peer"]
+  },
+  "layout_mappings": {
+    "labels": {
+      "components": "Components",
+      "relation_a": "Relation A",
+      "relation_b": "Relation B"
+    },
+    "hierarchy": ["Level1", "Level2", "Level3"],
+    "data_sources": {
+      "resource_tree": "provider:generic-hierarchy-provider",
+      "topology": "schema:generic-topology/topology[@id='selected_entity']",
+      "components": "schema:generic-topology/topology/component[@id='active_focused_element']/child-components",
+      "relation_a": "schema:generic-status/relation_a[target='active_focused_element']",
+      "relation_b": "schema:generic-events/relation_b[source='active_focused_element']"
+    },
+    "coordinate_mapping": {
+      "x": "position/dim_0",
+      "y": "position/dim_1",
+      "z": "position/dim_2",
+      "t": "position/time_index",
+      "trajectory": "position/vector"
+    }
+  }
+}

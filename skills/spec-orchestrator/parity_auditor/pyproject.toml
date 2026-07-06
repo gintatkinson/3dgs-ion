@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=61.0.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "parity_auditor"
+version = "0.1.0"
+description = "A modular package to verify model coverage and UML compliance"
+requires-python = ">=3.8"
+license = {text = "MIT"}
+classifiers = [
+    "Programming Language :: Python :: 3",
+]
+dependencies = []
+
+[project.scripts]
+parity-auditor = "parity_auditor.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

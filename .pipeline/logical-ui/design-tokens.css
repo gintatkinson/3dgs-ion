@@ -1,0 +1,24 @@
+/* Auto-generated design tokens. Do not edit directly. */
+:root {
+  --alias-color-background: #ffffff;
+  --alias-color-brand-primary: #1a73e8;
+  --alias-color-brand-primary-hover: #1557b0;
+  --alias-color-surface: #f1f3f4;
+  --alias-spacing-layout-min-pane-size: 150px;
+  --alias-spacing-layout-sidebar-width: 280px;
+  --alias-spacing-lg: 24px;
+  --alias-spacing-md: 16px;
+  --alias-spacing-sm: 8px;
+  --alias-spacing-xs: 4px;
+  --alias-typography-font-family: Outfit, Roboto, sans-serif;
+  --alias-typography-scale: high-density;
+  --component-button-background: #1a73e8;
+  --component-button-background-hover: #1557b0;
+  --component-sidebar-width: 280px;
+  --component-splitter-min-pane-size: 150px;
+}
+
+[data-theme="dark"] {
+  --alias-color-background: #121212;
+  --alias-color-surface: #202124;
+}

@@ -1,0 +1,35 @@
+{
+  "_copyright": "Copyright Gint Atkinson, gint.atkinson@gmail.com",
+  "criteria": [
+    {
+      "name": "functional_constitution_created",
+      "description": "Agent creates .pipeline/constitution.md with correct YAML frontmatter including tier: functional",
+      "weight": 2
+    },
+    {
+      "name": "platform_independence",
+      "description": "Functional constitution contains NO platform-specific references (no React, TypeScript, Jest, Playwright, npm, etc.)",
+      "weight": 3
+    },
+    {
+      "name": "domain_rules_present",
+      "description": "Functional constitution includes domain rules referencing standard/schema compliance matching the input domain",
+      "weight": 2
+    },
+    {
+      "name": "implementation_profile_created",
+      "description": "Agent creates .pipeline/profiles/{platform}.md with correct YAML frontmatter including tier: implementation and platform: {platform}",
+      "weight": 2
+    },
+    {
+      "name": "profile_references_constitution",
+      "description": "Implementation profile references .pipeline/constitution.md and instructs agents to read both",
+      "weight": 1
+    },
+    {
+      "name": "committed",
+      "description": "Agent commits both files with an appropriate commit message",
+      "weight": 1
+    }
+  ]
+}
