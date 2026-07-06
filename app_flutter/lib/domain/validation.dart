@@ -1,3 +1,6 @@
+final _countryRegex = RegExp(r'^[A-Z]{2}$');
+final _controlCharsRegex = RegExp(r'[\x00-\x1f\x7f]');
+
 /// Validates a TemporalContext.
 /// Property coverage: timestamp, validUntil, velocity
 bool validateTemporalContext(Map<String, dynamic> context) {
@@ -23,8 +26,7 @@ bool validatePostalAddress(Map<String, dynamic> addr) {
     return false;
   }
   // Country Code Validation: countryCode must match /^[A-Z]{2}$/ regex
-  final countryRegex = RegExp(r'^[A-Z]{2}$');
-  return countryRegex.hasMatch(countryCode);
+  return _countryRegex.hasMatch(countryCode);
 }
 
 /// Validates a PlaceType.
@@ -92,7 +94,7 @@ class ReferenceFrameValidation {
 
 String sanitizeFrameName(String name) {
   var result = name.trim();
-  result = result.replaceAll(RegExp(r'[\x00-\x1f\x7f]'), '');
+  result = result.replaceAll(_controlCharsRegex, '');
   if (result.toLowerCase().startsWith('the-')) {
     result = result.substring(4);
   }

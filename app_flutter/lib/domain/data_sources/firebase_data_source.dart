@@ -25,8 +25,6 @@ class FirebaseDataSource implements DataSource {
   FirebaseDataSource(this._firestore);
   final FirebaseFirestore _firestore;
   List<TypeDescriptor>? _cachedTypes;
-  final StreamController<Map<String, dynamic>> _propertiesController =
-      StreamController<Map<String, dynamic>>.broadcast();
 
   @override
   String get name => 'firebase';
@@ -151,7 +149,6 @@ class FirebaseDataSource implements DataSource {
   Future<void> saveProperties(String nodeId, Map<String, dynamic> data) async {
     try {
       await _firestore.collection('data').doc(nodeId).set(data, SetOptions(merge: true));
-      _propertiesController.add({'nodeId': nodeId, 'data': data});
     } catch (e, stackTrace) {
       debugPrint('Error in saveProperties($nodeId): $e\n$stackTrace');
     }
@@ -275,12 +272,7 @@ class FirebaseDataSource implements DataSource {
         final typeDesc = typeMap[id] ?? typeMap[typeName];
         final label = displayNameFromDoc ?? typeDesc?.displayName ?? id.replaceAll('_', ' ');
 
-        final childrenSnapshot = await _firestore
-            .collection('data')
-            .where('parent_node_id', isEqualTo: id)
-            .limit(1)
-            .get();
-        final hasChildren = childrenSnapshot.docs.isNotEmpty;
+        final hasChildren = docData['has_children'] as bool? ?? false;
 
         roots.add(TreeNode(
           id: id,
@@ -324,12 +316,7 @@ class FirebaseDataSource implements DataSource {
         final typeDesc = typeMap[id] ?? typeMap[typeName];
         final label = displayNameFromDoc ?? typeDesc?.displayName ?? id.replaceAll('_', ' ');
 
-        final hasChildrenSnapshot = await _firestore
-            .collection('data')
-            .where('parent_node_id', isEqualTo: id)
-            .limit(1)
-            .get();
-        final hasChildren = hasChildrenSnapshot.docs.isNotEmpty;
+        final hasChildren = docData['has_children'] as bool? ?? false;
 
         nodes.add(TreeNode(
           id: id,
@@ -385,7 +372,10 @@ class FirebaseDataSource implements DataSource {
   @override
   Future<TopologyData> fetchTopologyData() async {
     try {
-      final snapshot = await _firestore.collection('data').get();
+      final snapshot = await _firestore
+          .collection('data')
+          .where('has_location', isEqualTo: true)
+          .get();
       final List<TopologyNode> nodes = [];
       final List<TopologyLink> links = [];
 
@@ -466,8 +456,6 @@ class FirebaseDataSource implements DataSource {
   }
 
   @override
-  Future<void> dispose() async {
-    await _propertiesController.close();
-  }
+  Future<void> dispose() async {}
 }
 

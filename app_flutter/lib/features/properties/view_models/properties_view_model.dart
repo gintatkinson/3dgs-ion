@@ -21,7 +21,7 @@ class PropertiesViewModel extends ChangeNotifier {
 
   TypeDescriptor? _currentType;
   bool _disposed = false;
-  String? _activeTypeName;
+  int _requestId = 0;
 
   /// The fields of the currently loaded type. Returns an empty list when no
   /// type has been loaded or `loadType` returned `null`.
@@ -39,10 +39,10 @@ class PropertiesViewModel extends ChangeNotifier {
   /// throw — callers should check [hasType] if they need to distinguish.
   /// Replaces any previously loaded type unconditionally.
   Future<void> loadType(String typeName) async {
-    _activeTypeName = typeName;
+    final requestId = ++_requestId;
     final result = await _dataSource.typeFor(typeName);
     if (_disposed) return;
-    if (_activeTypeName != typeName) return;
+    if (_requestId != requestId) return;
     _currentType = result;
     notifyListeners();
   }

@@ -14,4 +14,15 @@ class ProjectedPoint {
 
   /// Creates a projected point from a pixel offset and a signed depth.
   ProjectedPoint(this.offset, this.z);
+
+  static final Map<int, ProjectedPoint> _pool = {};
+
+  factory ProjectedPoint.pooled(Offset offset, double z) {
+    final key = Object.hash(offset.dx, offset.dy, z);
+    return _pool.putIfAbsent(key, () => ProjectedPoint(offset, z));
+  }
+
+  static void clearPool() {
+    _pool.clear();
+  }
 }

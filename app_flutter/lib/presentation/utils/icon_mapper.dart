@@ -36,6 +36,6 @@ class IconMapper {
   /// Returns [Icons.insert_drive_file] as fallback if the name is unknown.
   /// An empty or null [name] also returns the fallback — it does not throw.
   /// The lookup is case-sensitive; "DNS" does not match "dns".
-  static IconData resolve(String name) =>
+  static IconData resolve(String? name) =>
       _icons[name] ?? Icons.insert_drive_file;
 }

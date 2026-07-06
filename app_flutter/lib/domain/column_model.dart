@@ -26,4 +26,18 @@ class ColumnModel {
       type: fd.type,
     );
   }
+
+  @override
+  bool operator ==(Object other) =>
+      other is ColumnModel &&
+      other.key == key &&
+      other.label == label &&
+      other.type == type &&
+      other.width == width &&
+      other.sortable == sortable &&
+      other.frozen == frozen &&
+      other.visible == visible;
+
+  @override
+  int get hashCode => Object.hash(key, label, type, width, sortable, frozen, visible);
 }

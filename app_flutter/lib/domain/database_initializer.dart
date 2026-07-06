@@ -14,7 +14,8 @@ Future<void> main() async {
   if (await file.exists()) {
     await file.delete();
   }
-  await DatabaseInitializer.create(dbPath: dbPath, seed: true);
+  final db = await DatabaseInitializer.create(dbPath: dbPath, seed: true);
+  await db.close();
   print('Generic database properties_db.db regenerated successfully.');
 
   final gzFile = File('assets/properties_db.db.gz');
@@ -68,92 +69,97 @@ class DatabaseInitializer {
     }
 
     final db = await databaseFactory.openDatabase(path);
-    await db.execute('PRAGMA journal_mode = WAL;');
-    await db.execute('PRAGMA busy_timeout = 5000;');
-    await db.execute('PRAGMA foreign_keys = ON;');
+    try {
+      await db.execute('PRAGMA journal_mode = WAL;');
+      await db.execute('PRAGMA busy_timeout = 5000;');
+      await db.execute('PRAGMA foreign_keys = ON;');
 
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS properties (
-        node_id TEXT PRIMARY KEY,
-        parent_node_id TEXT REFERENCES properties(node_id),
-        data_json TEXT NOT NULL
-      )
-    ''');
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS properties (
+          node_id TEXT PRIMARY KEY,
+          parent_node_id TEXT REFERENCES properties(node_id),
+          data_json TEXT NOT NULL
+        )
+      ''');
 
-    await db.execute('''
-      CREATE INDEX IF NOT EXISTS idx_properties_parent_node_id
-      ON properties(parent_node_id);
-    ''');
+      await db.execute('''
+        CREATE INDEX IF NOT EXISTS idx_properties_parent_node_id
+        ON properties(parent_node_id);
+      ''');
 
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS instances (
-        id TEXT PRIMARY KEY,
-        parent_node_id TEXT NOT NULL,
-        type_name TEXT NOT NULL,
-        data_json TEXT NOT NULL
-      )
-    ''');
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS instances (
+          id TEXT PRIMARY KEY,
+          parent_node_id TEXT NOT NULL,
+          type_name TEXT NOT NULL,
+          data_json TEXT NOT NULL
+        )
+      ''');
 
-    await db.execute('''
-      CREATE INDEX IF NOT EXISTS idx_instances_parent_type
-      ON instances(parent_node_id, type_name);
-    ''');
+      await db.execute('''
+        CREATE INDEX IF NOT EXISTS idx_instances_parent_type
+        ON instances(parent_node_id, type_name);
+      ''');
 
-    await db.execute('''
-      CREATE INDEX IF NOT EXISTS idx_instances_type_name
-      ON instances(type_name);
-    ''');
+      await db.execute('''
+        CREATE INDEX IF NOT EXISTS idx_instances_type_name
+        ON instances(type_name);
+      ''');
 
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS type_definitions (
-        type_name TEXT PRIMARY KEY,
-        display_name TEXT NOT NULL,
-        icon_name TEXT NOT NULL DEFAULT 'insert_drive_file'
-      )
-    ''');
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS type_definitions (
+          type_name TEXT PRIMARY KEY,
+          display_name TEXT NOT NULL,
+          icon_name TEXT NOT NULL DEFAULT 'insert_drive_file'
+        )
+      ''');
 
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS type_attributes (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        type_name TEXT NOT NULL REFERENCES type_definitions(type_name),
-        attr_key TEXT NOT NULL,
-        label TEXT NOT NULL,
-        attr_type TEXT NOT NULL,
-        section_label TEXT,
-        section_order INTEGER NOT NULL DEFAULT 0,
-        is_required INTEGER NOT NULL DEFAULT 0,
-        min_value REAL,
-        max_value REAL,
-        pattern TEXT,
-        enum_options TEXT,
-        enum_display_names TEXT,
-        default_value TEXT,
-        input_formatters TEXT,
-        UNIQUE(type_name, attr_key)
-      )
-    ''');
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS type_attributes (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          type_name TEXT NOT NULL REFERENCES type_definitions(type_name),
+          attr_key TEXT NOT NULL,
+          label TEXT NOT NULL,
+          attr_type TEXT NOT NULL,
+          section_label TEXT,
+          section_order INTEGER NOT NULL DEFAULT 0,
+          is_required INTEGER NOT NULL DEFAULT 0,
+          min_value REAL,
+          max_value REAL,
+          pattern TEXT,
+          enum_options TEXT,
+          enum_display_names TEXT,
+          default_value TEXT,
+          input_formatters TEXT,
+          UNIQUE(type_name, attr_key)
+        )
+      ''');
 
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS type_relations (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        parent_type_name TEXT NOT NULL REFERENCES type_definitions(type_name),
-        relation_name TEXT NOT NULL,
-        child_type_name TEXT NOT NULL REFERENCES type_definitions(type_name),
-        child_label TEXT NOT NULL,
-        UNIQUE(parent_type_name, child_type_name)
-      )
-    ''');
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS type_relations (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          parent_type_name TEXT NOT NULL REFERENCES type_definitions(type_name),
+          relation_name TEXT NOT NULL,
+          child_type_name TEXT NOT NULL REFERENCES type_definitions(type_name),
+          child_label TEXT NOT NULL,
+          UNIQUE(parent_type_name, child_type_name)
+        )
+      ''');
 
-    if (seed) {
-      final countResult =
-          await db.rawQuery('SELECT COUNT(*) as count FROM type_definitions');
-      final count = countResult.first['count'] as int? ?? 0;
-      if (count == 0) {
-        await _seed(db);
+      if (seed) {
+        final countResult =
+            await db.rawQuery('SELECT COUNT(*) as count FROM type_definitions');
+        final count = countResult.first['count'] as int? ?? 0;
+        if (count == 0) {
+          await _seed(db);
+        }
       }
-    }
 
-    return db;
+      return db;
+    } catch (e) {
+      await db.close();
+      rethrow;
+    }
   }
 
   /// Inserts sample data.
