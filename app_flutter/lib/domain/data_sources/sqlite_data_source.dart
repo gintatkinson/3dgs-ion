@@ -23,12 +23,14 @@ class SqliteDataSource implements DataSource {
   final Database _db;
   final StreamController<Map<String, dynamic>> _propertiesController =
       StreamController<Map<String, dynamic>>.broadcast();
+  List<TypeDescriptor>? _cachedTypes;
 
   @override
   String get name => 'sqlite';
 
   @override
   Future<void> dispose() async {
+    _cachedTypes = null;
     await _propertiesController.close();
     await _db.close();
   }
@@ -44,6 +46,7 @@ class SqliteDataSource implements DataSource {
   /// simply produce empty fields/childTypes.
   @override
   Future<List<TypeDescriptor>> discoverTypes() async {
+    if (_cachedTypes != null) return _cachedTypes!;
     try {
       final typeRows = await _db.query('type_definitions');
       final allAttrRows = await _db.query('type_attributes', orderBy: 'section_order, id');
@@ -84,6 +87,8 @@ class SqliteDataSource implements DataSource {
           parentTypes: [],
         );
       }).toList();
+      _cachedTypes = types;
+      return types;
     } catch (e, stackTrace) {
       debugPrint('Error in discoverTypes: $e\n$stackTrace');
       return [];
