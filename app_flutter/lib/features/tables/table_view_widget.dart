@@ -47,6 +47,47 @@ class _TableViewWidgetState extends State<TableViewWidget> {
   int? _sortColumnIndex;
   bool _sortAscending = true;
 
+  List<List<String>>? _cachedSourceRows;
+  List<ColumnModel>? _cachedHeaders;
+  List<List<String>>? _cachedSortedRows;
+  int? _cachedSortColumnIndex;
+  bool? _cachedSortAscending;
+
+  List<List<String>> _getSortedRows(
+    List<List<String>> rows,
+    List<ColumnModel> headers,
+    Map<String, int> headerIndices,
+  ) {
+    if (_sortColumnIndex == null || _sortColumnIndex! >= headers.length) {
+      return rows;
+    }
+
+    if (identical(_cachedSourceRows, rows) &&
+        identical(_cachedHeaders, headers) &&
+        _cachedSortColumnIndex == _sortColumnIndex &&
+        _cachedSortAscending == _sortAscending &&
+        _cachedSortedRows != null) {
+      return _cachedSortedRows!;
+    }
+
+    _cachedSourceRows = rows;
+    _cachedHeaders = headers;
+    _cachedSortColumnIndex = _sortColumnIndex;
+    _cachedSortAscending = _sortAscending;
+
+    final sortedRows = List<List<String>>.from(rows);
+    final key = headers[_sortColumnIndex!].key;
+    final absIdx = headerIndices[key] ?? _sortColumnIndex!;
+    sortedRows.sort((a, b) {
+      final aVal = absIdx < a.length ? a[absIdx] : '';
+      final bVal = absIdx < b.length ? b[absIdx] : '';
+      return _sortAscending ? aVal.compareTo(bVal) : bVal.compareTo(aVal);
+    });
+
+    _cachedSortedRows = sortedRows;
+    return sortedRows;
+  }
+
   @override
   Widget build(BuildContext context) {
     final viewModel = context.watch<TablesViewModel>();
@@ -72,25 +113,13 @@ class _TableViewWidgetState extends State<TableViewWidget> {
 
     final headers = viewModel.visibleColumnModels;
     final allHeaders = viewModel.headers;
-    var rows = viewModel.rows;
-    final testId = '${viewModel.tabId}-table';
-
     final headerIndices = <String, int>{
       for (int idx = 0; idx < allHeaders.length; idx++)
         allHeaders[idx].key: idx
     };
 
-    if (_sortColumnIndex != null && _sortColumnIndex! < headers.length) {
-      final sortedRows = List<List<String>>.from(rows);
-      final key = headers[_sortColumnIndex!].key;
-      final absIdx = headerIndices[key] ?? _sortColumnIndex!;
-      sortedRows.sort((a, b) {
-        final aVal = absIdx < a.length ? a[absIdx] : '';
-        final bVal = absIdx < b.length ? b[absIdx] : '';
-        return _sortAscending ? aVal.compareTo(bVal) : bVal.compareTo(aVal);
-      });
-      rows = sortedRows;
-    }
+    final rows = _getSortedRows(viewModel.rows, headers, headerIndices);
+    final testId = '${viewModel.tabId}-table';
 
     if (headers.isEmpty) {
       return const SizedBox.shrink();

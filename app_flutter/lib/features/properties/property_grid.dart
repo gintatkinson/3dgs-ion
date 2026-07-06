@@ -226,14 +226,19 @@ class _PropertyGridState extends State<PropertyGrid> {
       setState(() {
         committedData = Map<String, dynamic>.from(widget.initialValues);
         _errors = const {};
-        for (final field in _fields) {
-          final focusNode = _focusNodes[field.key];
-          if (focusNode != null && !focusNode.hasFocus) {
-            final newVal = widget.initialValues[field.key] ?? committedData[field.key];
-            final text = newVal != null ? newVal.toString() : '';
-            _controllers[field.key]?.text = text;
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        setState(() {
+          for (final field in _fields) {
+            final focusNode = _focusNodes[field.key];
+            if (focusNode != null && !focusNode.hasFocus) {
+              final newVal = widget.initialValues[field.key] ?? committedData[field.key];
+              final text = newVal != null ? newVal.toString() : '';
+              _controllers[field.key]?.text = text;
+            }
           }
-        }
+        });
       });
     }
   }
@@ -314,6 +319,9 @@ class _PropertyGridState extends State<PropertyGrid> {
   /// that callers only see consistent, valid state snapshots.
   void _triggerBlurSave(String key, FieldDescriptor field) {
     if (!mounted) return;
+    if (!_controllers.containsKey(key) || !_focusNodes.containsKey(key)) {
+      return;
+    }
     final valueString = field.type == 'enum'
         ? (committedData[key]?.toString() ?? '')
         : (_controllers[key]?.text ?? '');
