@@ -36,6 +36,7 @@ bridge_handle_t bridge_initialize(
 
   try {
     std::lock_guard<std::mutex> lock(g_statesMutex);
+    if (g_nextHandle == INT32_MAX) return BRIDGE_ERR_MEMORY;
     bridge_handle_t handle = g_nextHandle++;
 
     auto state = std::make_unique<BridgeState>();
