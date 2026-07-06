@@ -32,6 +32,8 @@ class CesiumEngine {
       config.ref.tilesetUrl = nullptr;
     }
 
+    // Callback intentionally nullptr. See bridge_bindings.dart for thread
+    // safety notes before wiring a real Dart callback here.
     final handle = bindings.initialize(config, nullptr, nullptr);
 
     if (tilesetUrl != null && tilesetUrl.isNotEmpty) {
@@ -152,6 +154,8 @@ class CesiumEngine {
 
   void requestTileData(String tileId, void Function(Uint8List data) onReady) {
     final tileIdNative = tileId.toNativeUtf8(allocator: calloc);
+    // Callback intentionally nullptr. See bridge_bindings.dart for thread
+    // safety notes before wiring a real Dart callback here.
     _bindings.requestTileData(_handle, tileIdNative, nullptr, nullptr);
     calloc.free(tileIdNative);
   }

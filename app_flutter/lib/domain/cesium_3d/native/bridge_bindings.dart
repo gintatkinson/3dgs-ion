@@ -35,6 +35,17 @@ final class BridgeTilesetConfig extends Struct {
 
 typedef BridgeHandle = Int32;
 
+// NOTE — THREAD SAFETY:
+// Native callbacks (BridgeErrorCallback, BridgeTileReadyCallback,
+// BridgeCameraChangedCallback) are registered via Pointer.fromFunction and
+// may be invoked from native worker threads. The Dart VM prohibits calling
+// into Dart from a non-main-isolate thread.
+//
+// Known limitation: the current stub (bridge.cpp returns error codes for
+// tile requests) passes nullptr for every callback, so no actual thread
+// violation can occur at runtime. When real callbacks are implemented,
+// NativeCallable.listener (Dart SDK >= 3.4) should be used instead of
+// Pointer.fromFunction to guarantee correct thread affinity.
 typedef BridgeErrorCallbackNative = Void Function(
   Int32 errorCode, Pointer<Utf8> message, Pointer<Void> userData,
 );

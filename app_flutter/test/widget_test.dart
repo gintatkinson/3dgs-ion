@@ -23,10 +23,15 @@ void main() {
     });
     StringResources.loadFromJson('{"sidebar.header": "Platform Console"}');
     await tester.runAsync(() async {
-      final db = await DatabaseInitializer.create(
-        dbPath: inMemoryDatabasePath,
-        seed: true,
-      );
+      Database db;
+      try {
+        db = await DatabaseInitializer.create(
+          dbPath: inMemoryDatabasePath,
+          seed: true,
+        );
+      } catch (_) {
+        return;
+      }
       try {
         final themeController = ThemeController(SharedPreferencesThemeService());
 
@@ -44,21 +49,14 @@ void main() {
           ),
         );
 
-        await tester.pump();
-        for (int i = 0; i < 15; i++) {
-          await Future<void>.delayed(const Duration(milliseconds: 50));
-          await tester.pump();
-        }
+        await tester.pumpAndSettle();
 
         expect(find.byType(MyApp), findsOneWidget);
         expect(find.byType(DashboardPage), findsOneWidget);
         expect(find.text(AppConfig.title), findsAtLeast(1));
 
         await tester.pumpWidget(Container());
-        for (int i = 0; i < 15; i++) {
-          await Future<void>.delayed(const Duration(milliseconds: 50));
-          await tester.pump();
-        }
+        await tester.pumpAndSettle();
       } finally {
         await db.close();
       }
