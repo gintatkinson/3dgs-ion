@@ -6,6 +6,7 @@
 #include <glm/vec3.hpp>
 #include <glm/trigonometric.hpp>
 
+#include <cmath>
 #include <cstring>
 #include <memory>
 #include <mutex>
@@ -122,6 +123,12 @@ int32_t bridge_cartographic_to_ecef(
     double* out_z) {
   if (!out_x || !out_y || !out_z) return BRIDGE_ERR_CAMERA;
 
+  if (std::isnan(lat_deg) || std::isnan(lng_deg) || std::isnan(alt_m) ||
+      std::isinf(lat_deg) || std::isinf(lng_deg) || std::isinf(alt_m) ||
+      lat_deg < -90.0 || lat_deg > 90.0) {
+    return BRIDGE_ERR_CAMERA;
+  }
+
   try {
     const CesiumGeospatial::Ellipsoid& ellipsoid = CesiumGeospatial::Ellipsoid::WGS84;
     const CesiumGeospatial::Cartographic carto = CesiumGeospatial::Cartographic::fromDegrees(lng_deg, lat_deg, alt_m);
@@ -137,6 +144,8 @@ int32_t bridge_cartographic_to_ecef(
     return BRIDGE_OK;
   } catch (const std::exception&) {
     return BRIDGE_ERR_CAMERA;
+  } catch (...) {
+    return BRIDGE_ERR_CAMERA;
   }
 }
 
@@ -148,6 +157,11 @@ int32_t bridge_ecef_to_cartographic(
     double* out_lng_deg,
     double* out_alt_m) {
   if (!out_lat_deg || !out_lng_deg || !out_alt_m) return BRIDGE_ERR_CAMERA;
+
+  if (std::isnan(x) || std::isnan(y) || std::isnan(z) ||
+      std::isinf(x) || std::isinf(y) || std::isinf(z)) {
+    return BRIDGE_ERR_CAMERA;
+  }
 
   try {
     const CesiumGeospatial::Ellipsoid& ellipsoid = CesiumGeospatial::Ellipsoid::WGS84;
@@ -162,6 +176,8 @@ int32_t bridge_ecef_to_cartographic(
     *out_alt_m = carto->height;
     return BRIDGE_OK;
   } catch (const std::exception&) {
+    return BRIDGE_ERR_CAMERA;
+  } catch (...) {
     return BRIDGE_ERR_CAMERA;
   }
 }
