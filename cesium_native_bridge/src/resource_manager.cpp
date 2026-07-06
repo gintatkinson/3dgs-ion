@@ -5,6 +5,9 @@
 extern "C" {
 
 void* bridge_alloc(int32_t size_bytes) {
+  if (size_bytes <= 0) {
+    return nullptr;
+  }
   return std::malloc(static_cast<size_t>(size_bytes));
 }
 
