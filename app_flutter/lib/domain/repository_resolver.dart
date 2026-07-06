@@ -32,6 +32,7 @@ class RepositoryResolver {
   static const _defaultEmulatorPort = 8080;
 
   static DataSource? _lastResolved;
+  static bool _firebaseEmulatorConfigured = false;
 
   /// Resolves and initialises the appropriate backend.
   ///
@@ -100,8 +101,9 @@ class RepositoryResolver {
   }) async {
     await Firebase.initializeApp();
     final firestore = FirebaseFirestore.instance;
-    if (useEmulator) {
+    if (useEmulator && !_firebaseEmulatorConfigured) {
       firestore.useFirestoreEmulator(_defaultEmulatorHost, _defaultEmulatorPort);
+      _firebaseEmulatorConfigured = true;
     }
     return FirebaseDataSource(firestore);
   }
