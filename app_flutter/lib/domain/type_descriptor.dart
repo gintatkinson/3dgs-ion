@@ -79,6 +79,14 @@ class TypeDescriptor {
 /// An empty [FieldDescriptor] is invalid; at minimum [key], [label], and
 /// [type] must be provided.
 class FieldDescriptor {
+  static final _compiledPatterns = <String, RegExp>{};
+
+  /// Returns a cached compiled [RegExp] for [pattern], or null if [pattern]
+  /// is null or empty. Reuses previously compiled instances to avoid GC churn.
+  RegExp? get compiledPattern {
+    if (pattern == null || pattern!.isEmpty) return null;
+    return _compiledPatterns.putIfAbsent(pattern!, () => RegExp(pattern!));
+  }
   /// Unique key within the type, e.g. "maxVoltage".
   ///
   /// Used as the map key when reading/writing property data.

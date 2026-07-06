@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'package:app_flutter/domain/type_descriptor.dart';
 
+final _patternCache = <String, RegExp>{};
+
 /// Exception thrown when schema validation of an [InstanceRecord] fails.
 class SchemaValidationException implements Exception {
   /// The validation error message.
@@ -125,7 +127,7 @@ class InstanceRecord {
           }
         } else if (fd.type == 'string') {
           if (fd.pattern != null && fd.pattern!.isNotEmpty) {
-            final regex = RegExp(fd.pattern!);
+            final regex = _patternCache.putIfAbsent(fd.pattern!, () => RegExp(fd.pattern!));
             if (!regex.hasMatch(strVal)) {
               final msg = 'Attribute "${fd.key}" value "$strVal" does not match pattern "${fd.pattern}" for instance "$id".';
               print('WARNING: $msg');
