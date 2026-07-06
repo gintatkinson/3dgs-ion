@@ -199,15 +199,18 @@ List<BreadcrumbItem> getBreadcrumbsItems(
   List<TreeNode> treeData, {
   ValueChanged<String>? onSelectView,
 }) {
+  String? homeTargetId;
+  if (treeData.isNotEmpty) {
+    homeTargetId = getFirstLeafId(treeData.first);
+  }
+
   final List<BreadcrumbItem> base = [
     BreadcrumbItem(
       id: 'home',
       label: StringResources.get('breadcrumbs.home'),
-      onClick: () {
-        if (treeData.isNotEmpty) {
-          onSelectView?.call(getFirstLeafId(treeData.first));
-        }
-      },
+      onClick: homeTargetId != null
+          ? () => onSelectView?.call(homeTargetId!)
+          : null,
     ),
   ];
 
@@ -235,11 +238,12 @@ List<BreadcrumbItem> getBreadcrumbsItems(
     if (i == path.length - 1) {
       items.add(BreadcrumbItem(id: node.id, label: node.label));
     } else {
+      final targetLeafId = getFirstLeafId(node);
       items.add(
         BreadcrumbItem(
           id: node.id,
           label: node.label,
-          onClick: () => onSelectView?.call(getFirstLeafId(node)),
+          onClick: () => onSelectView?.call(targetLeafId),
         ),
       );
     }

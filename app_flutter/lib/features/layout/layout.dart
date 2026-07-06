@@ -183,7 +183,26 @@ class _LayoutState extends State<Layout> {
       if (mounted) setState(() {});
     });
 
+    _preloadConfigs();
     _preloadTopologyData();
+  }
+
+  Future<void> _preloadConfigs() async {
+    try {
+      final rulesFile = File('.pipeline/logical-ui/codebase_rules.json');
+      if (await rulesFile.exists()) {
+        final content = await rulesFile.readAsString();
+        _cachedRules = jsonDecode(content) as Map<String, dynamic>;
+      }
+      final labelsFile = File('.pipeline/logical-ui/labels.json');
+      if (await labelsFile.exists()) {
+        final content = await labelsFile.readAsString();
+        _cachedLabels = jsonDecode(content) as Map<String, dynamic>;
+      }
+      if (mounted) {
+        setState(() {});
+      }
+    } catch (_) {}
   }
 
   /// Preloads topology data from an external JSON asset for later use.

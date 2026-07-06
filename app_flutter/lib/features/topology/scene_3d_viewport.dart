@@ -177,6 +177,7 @@ class Scene3DViewportState extends State<Scene3DViewport> {
     _globeFocusNode.dispose();
     _cameraController.removeListener(_onCameraChangedInside);
     _cameraController.dispose();
+    _tileRenderer?.dispose();
     super.dispose();
   }
 
