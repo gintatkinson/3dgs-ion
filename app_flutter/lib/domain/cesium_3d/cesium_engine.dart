@@ -18,6 +18,8 @@ class CesiumEngine {
     int maxSimultaneousTileLoads = 20,
     int maxCachedBytes = 256 * 1024 * 1024,
   }) async {
+    _instance?.dispose();
+
     final bindings = CesiumNativeBindings.load();
 
     final config = calloc<BridgeTilesetConfig>();
@@ -66,26 +68,32 @@ class CesiumEngine {
 
   int getVisibleTileCount() {
     final countPtr = calloc<Int32>();
-    final result = _bindings.getVisibleTileCount(_handle, countPtr);
-    checkStatus(result);
-    final count = countPtr.value;
-    calloc.free(countPtr);
-    return count;
+    try {
+      final result = _bindings.getVisibleTileCount(_handle, countPtr);
+      checkStatus(result);
+      return countPtr.value;
+    } finally {
+      calloc.free(countPtr);
+    }
   }
 
   String? getVisibleTileId(int index) {
     final idPtr = calloc<Pointer<Utf8>>();
-    final result = _bindings.getVisibleTileId(_handle, index, idPtr);
-    if (result == -3) {
-      calloc.free(idPtr);
-      return null;
-    }
-    checkStatus(result);
+    try {
+      final result = _bindings.getVisibleTileId(_handle, index, idPtr);
+      if (result == -3) {
+        return null;
+      }
+      checkStatus(result);
 
-    final id = idPtr.value.toDartString();
-    _bindings.freeString(idPtr.value);
-    calloc.free(idPtr);
-    return id;
+      final id = idPtr.value.toDartString();
+      try {
+        _bindings.freeString(idPtr.value);
+      } catch (_) {}
+      return id;
+    } finally {
+      calloc.free(idPtr);
+    }
   }
 
   List<String> getVisibleTileIds() {

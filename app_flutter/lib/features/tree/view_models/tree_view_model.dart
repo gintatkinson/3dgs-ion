@@ -134,21 +134,25 @@ class TreeViewModel extends ChangeNotifier {
     }
 
     if (node.children != null && node.children!.isEmpty) {
+      if (_loadingNodes[node.id] == true) return;
       _loadingNodes[node.id] = true;
       notifyListeners();
 
       try {
         final children = await _dataSource.fetchChildrenForNode(node.id);
+        if (_disposed) return;
+        if (!_loadingNodes.containsKey(node.id)) return;
         _sortNodesRecursively(children);
         node.children = children;
         _buildNodeKeys(children);
       } catch (e) {
         debugPrint('Error loading children: $e');
       } finally {
-        _loadingNodes[node.id] = false;
+        _loadingNodes.remove(node.id);
       }
     }
 
+    if (_disposed) return;
     _expanded[node.id] = true;
     notifyListeners();
   }

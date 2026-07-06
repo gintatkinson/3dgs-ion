@@ -50,6 +50,7 @@ class TileCache {
   /// Inserts [value] under [key], evicting the LRU entry first if the cache
   /// is already at capacity.
   void put(String key, Uint8List value) {
+    _map.remove(key);
     if (_map.length >= _maxSize) {
       _map.remove(_map.keys.first);
     }
@@ -95,6 +96,11 @@ class TileFetcher {
   /// always returns `null`.
   void disable() {
     _enabled = false;
+  }
+
+  void dispose() {
+    _client.close(force: true);
+    _cache.clear();
   }
 
   /// Empties the internal tile cache. Useful when switching providers so
@@ -156,6 +162,7 @@ class TileFetcher {
         _cache.put(key, data);
         return data;
       }
+      await response.drain();
     } catch (_) {
       // Swallow — return null on any failure.
     }

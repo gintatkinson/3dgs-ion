@@ -93,9 +93,12 @@ class _SplitWorkspaceState extends State<SplitWorkspace> {
           _initialized = true;
         }
 
+        final maxPossibleFirstPane = (totalSize - widget.dividerSize).clamp(0, totalSize).toDouble();
+        final safeMinFirstPane = math.min(widget.minFirstPaneSize, maxPossibleFirstPane);
+
         final clampedFirstPane = _firstPaneSize.clamp(
-          widget.minFirstPaneSize,
-          math.max(widget.minFirstPaneSize, totalSize - widget.minFirstPaneSize),
+          safeMinFirstPane,
+          math.max(safeMinFirstPane, totalSize - widget.minFirstPaneSize),
         ).toDouble();
 
         final isHorizontal = widget.direction == Axis.horizontal;

@@ -61,33 +61,21 @@ class CameraController extends ChangeNotifier {
   }
 
   static VirtualCamera _lerpCamera(VirtualCamera a, VirtualCamera b, double t) {
-    double lerpLng(double from, double to) {
-      double diff = to - from;
-      if (diff > 180) diff -= 360;
-      if (diff < -180) diff += 360;
-      return _wrapLngStatic(from + diff * t);
-    }
-    double lerpHeading(double from, double to) {
-      double diff = to - from;
-      if (diff > 180) diff -= 360;
-      if (diff < -180) diff += 360;
-      return _wrapHeadingStatic(from + diff * t);
-    }
-    double lerpPitch(double from, double to) {
-      double diff = to - from;
-      if (diff > 180) diff -= 360;
-      if (diff < -180) diff += 360;
-      return _wrapPitchStatic(from + diff * t);
-    }
-
     return VirtualCamera.clamped(
       latitude: a.latitude + (b.latitude - a.latitude) * t,
-      longitude: lerpLng(a.longitude, b.longitude),
+      longitude: _interpolateCircular(a.longitude, b.longitude, t, _wrapLngStatic),
       altitude: a.altitude + (b.altitude - a.altitude) * t,
-      heading: lerpHeading(a.heading, b.heading),
-      pitch: lerpPitch(a.pitch, b.pitch),
+      heading: _interpolateCircular(a.heading, b.heading, t, _wrapHeadingStatic),
+      pitch: _interpolateCircular(a.pitch, b.pitch, t, _wrapPitchStatic),
       roll: a.roll + (b.roll - a.roll) * t,
     );
+  }
+
+  static double _interpolateCircular(double from, double to, double t, double Function(double) wrapFn) {
+    double diff = to - from;
+    if (diff > 180) diff -= 360;
+    if (diff < -180) diff += 360;
+    return wrapFn(from + diff * t);
   }
 
   static double _wrapLngStatic(double lng) {
