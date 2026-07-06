@@ -4,25 +4,43 @@ import 'package:ffi/ffi.dart';
 final _finalizer = NativeFinalizer(calloc.nativeFree);
 
 final class NativeResource implements Finalizable {
-  final Pointer<Void> pointer;
+  Pointer<Void> _pointer;
   final int sizeBytes;
   bool _isReleased = false;
 
   bool get isReleased => _isReleased;
 
-  NativeResource._(this.pointer, this.sizeBytes) {
-    _finalizer.attach(this, pointer, detach: this, externalSize: sizeBytes);
+  Pointer<Void> get pointer {
+    if (_isReleased) {
+      throw StateError('Cannot access pointer after NativeResource has been released.');
+    }
+    return _pointer;
+  }
+
+  NativeResource._(this._pointer, this.sizeBytes) {
+    _finalizer.attach(this, _pointer, detach: this, externalSize: sizeBytes);
   }
 
   factory NativeResource.alloc(int count, int elementSize) {
-    final ptr = calloc<Int8>(count * elementSize);
-    return NativeResource._(ptr.cast(), count * elementSize);
+    if (count <= 0 || elementSize <= 0) {
+      throw ArgumentError('Count and element size must be positive.');
+    }
+    if (count > 0x7FFFFFFFFFFFFFFF ~/ elementSize) {
+      throw ArgumentError('Allocation size overflow.');
+    }
+    final totalSize = count * elementSize;
+    final ptr = calloc<Int8>(totalSize);
+    if (ptr == nullptr) {
+      throw OutOfMemoryError();
+    }
+    return NativeResource._(ptr.cast(), totalSize);
   }
 
   void release() {
     if (_isReleased) return;
     _isReleased = true;
     _finalizer.detach(this);
-    calloc.free(pointer);
+    calloc.free(_pointer);
+    _pointer = nullptr;
   }
 }

@@ -46,6 +46,10 @@ class GlobeTileRenderer {
   /// Set of tile keys for which an HTTP fetch is currently in-flight.
   final Set<String> _pendingFetches = {};
 
+  bool _disposed = false;
+  int _activeFetchCount = 0;
+  static const int _maxConcurrentFetches = 16;
+
   /// Creates a renderer that will fetch tiles via [fetcher] and initially
   /// use [initialProvider] as the imagery source.
   GlobeTileRenderer({
@@ -73,6 +77,7 @@ class GlobeTileRenderer {
 
   /// Disposes all loaded tile images and clears the cache.
   void dispose() {
+    _disposed = true;
     for (final img in _loadedImages.values) {
       img.dispose();
     }
@@ -209,22 +214,41 @@ class GlobeTileRenderer {
       }
     }
 
-    // Cap at 16 concurrent in-flight requests.
-    for (int i = 0; i < toFetch.length; i += 16) {
-      final batch = toFetch.skip(i).take(16);
-      await Future.wait(batch.map(_fetchAndDecode));
+    if (toFetch.isEmpty) return;
+
+    for (final tile in toFetch) {
+      if (_activeFetchCount >= _maxConcurrentFetches) {
+        break;
+      }
+      _fetchAndDecode(tile);
     }
   }
 
   Future<void> _fetchAndDecode(TileCoord tile) async {
+    final providerAtStart = _activeProvider;
     _pendingFetches.add(tile.key);
+    _activeFetchCount++;
     try {
       final data = await _fetcher.fetchTile(
-          _activeProvider, tile.zoom, tile.x, tile.y);
+          providerAtStart, tile.zoom, tile.x, tile.y);
+      if (_disposed || _activeProvider != providerAtStart) {
+        return;
+      }
       if (data != null) {
         final codec = await ui.instantiateImageCodec(data);
+        if (_disposed || _activeProvider != providerAtStart) {
+          return;
+        }
         final frame = await codec.getNextFrame();
+        if (_disposed || _activeProvider != providerAtStart) {
+          return;
+        }
         final image = frame.image;
+
+        final existing = _loadedImages[tile.key];
+        if (existing != null) {
+          existing.dispose();
+        }
         _loadedImages[tile.key] = image;
         if (_loadedImages.length > 64) {
           final firstKey = _loadedImages.keys.first;
@@ -235,6 +259,7 @@ class GlobeTileRenderer {
       }
     } finally {
       _pendingFetches.remove(tile.key);
+      _activeFetchCount--;
     }
   }
 

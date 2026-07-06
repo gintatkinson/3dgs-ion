@@ -15,13 +15,14 @@ class VirtualCamera {
   final double pitch;
   final double roll;
 
-  VirtualCamera({
-    required this.latitude,
-    required this.longitude,
-    required this.altitude,
-    required this.heading,
-    required this.pitch,
-    required this.roll,
+  /// Public factory constructor preserving runtime exception behavior.
+  factory VirtualCamera({
+    required double latitude,
+    required double longitude,
+    required double altitude,
+    required double heading,
+    required double pitch,
+    required double roll,
   }) {
     if (latitude.isNaN || latitude.isInfinite ||
         longitude.isNaN || longitude.isInfinite ||
@@ -40,7 +41,35 @@ class VirtualCamera {
     if (altitude < -100.0) {
       throw CoordinateValidationException('Altitude must be greater than or equal to -100.0 meters.');
     }
+    return VirtualCamera.raw(
+      latitude: latitude,
+      longitude: longitude,
+      altitude: altitude,
+      heading: heading,
+      pitch: pitch,
+      roll: roll,
+    );
   }
+
+  /// Internal const constructor for compile-time optimization.
+  const VirtualCamera.raw({
+    required this.latitude,
+    required this.longitude,
+    required this.altitude,
+    required this.heading,
+    required this.pitch,
+    required this.roll,
+  });
+
+  /// A static constant representing a default camera at origin.
+  static const zero = VirtualCamera.raw(
+    latitude: 0.0,
+    longitude: 0.0,
+    altitude: 0.0,
+    heading: 0.0,
+    pitch: 0.0,
+    roll: 0.0,
+  );
 
   /// Creates a copy of VirtualCamera with clamped values if they exceed boundaries.
   /// Clamps altitude to at least -100.0, latitude to [-90, 90], and longitude to [-180, 180].
