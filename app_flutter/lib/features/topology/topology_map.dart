@@ -854,21 +854,25 @@ class TopologyPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    // 1. Draw background
-    final Paint bgPaint = Paint()..color = colors.bgColor;
-    canvas.drawRect(Offset.zero & size, bgPaint);
-
-    // 2. Draw grid lines every 40px
-    final Paint gridPaint = Paint()
-      ..color = colors.gridColor
-      ..strokeWidth = 1.0
-      ..style = PaintingStyle.stroke;
-
-    for (double x = 0; x < size.width; x += gridSpacing) {
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), gridPaint);
+    // 1. Draw background (skip if nodes will cover the viewport)
+    if (activeData.nodes.isEmpty) {
+      final Paint bgPaint = Paint()..color = colors.bgColor;
+      canvas.drawRect(Offset.zero & size, bgPaint);
     }
-    for (double y = 0; y < size.height; y += gridSpacing) {
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
+
+    // 2. Draw grid lines
+    if (gridSpacing > 0) {
+      final Paint gridPaint = Paint()
+        ..color = colors.gridColor
+        ..strokeWidth = 1.0
+        ..style = PaintingStyle.stroke;
+
+      for (double x = 0; x < size.width; x += gridSpacing) {
+        canvas.drawLine(Offset(x, 0), Offset(x, size.height), gridPaint);
+      }
+      for (double y = 0; y < size.height; y += gridSpacing) {
+        canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
+      }
     }
 
     // 3. Compute projected positions
@@ -1003,7 +1007,8 @@ class _TextPainterCache {
     if (existing != null) return existing;
 
     if (_cache.length >= _maxEntries) {
-      _cache.remove(_cache.keys.first);
+      final evictedKey = _cache.keys.first;
+      _cache.remove(evictedKey)?.dispose();
     }
     final painter = TextPainter(
       text: TextSpan(
@@ -1018,5 +1023,12 @@ class _TextPainterCache {
     painter.layout();
     _cache[key] = painter;
     return painter;
+  }
+
+  static void clear() {
+    for (final painter in _cache.values) {
+      painter.dispose();
+    }
+    _cache.clear();
   }
 }

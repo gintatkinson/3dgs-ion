@@ -8,11 +8,23 @@
 class TreeNode {
   final String id;
   final String label;
-  List<TreeNode>? children;
+  final List<TreeNode>? children;
 
-  TreeNode({
+  const TreeNode({
     required this.id,
     required this.label,
     this.children,
   });
+
+  TreeNode copyWith({
+    String? id,
+    String? label,
+    List<TreeNode>? children,
+  }) {
+    return TreeNode(
+      id: id ?? this.id,
+      label: label ?? this.label,
+      children: children ?? this.children,
+    );
+  }
 }

@@ -143,7 +143,7 @@ class TreeViewModel extends ChangeNotifier {
         if (_disposed) return;
         if (!_loadingNodes.containsKey(node.id)) return;
         _sortNodesRecursively(children);
-        node.children = children;
+        _replaceNodeInTree(node.id, children);
         _buildNodeKeys(children);
       } catch (e) {
         debugPrint('Error loading children: $e');
@@ -354,6 +354,23 @@ class TreeViewModel extends ChangeNotifier {
         _sortNodesRecursively(node.children!);
       }
     }
+  }
+
+  void _replaceNodeInTree(String nodeId, List<TreeNode> newChildren) {
+    _replaceNodeInList(_treeData, nodeId, newChildren);
+  }
+
+  bool _replaceNodeInList(List<TreeNode> nodes, String targetId, List<TreeNode> newChildren) {
+    for (int i = 0; i < nodes.length; i++) {
+      if (nodes[i].id == targetId) {
+        nodes[i] = nodes[i].copyWith(children: newChildren);
+        return true;
+      }
+      if (nodes[i].children != null) {
+        if (_replaceNodeInList(nodes[i].children!, targetId, newChildren)) return true;
+      }
+    }
+    return false;
   }
 
   int _naturalCompare(String a, String b) {
