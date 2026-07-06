@@ -19,13 +19,19 @@ import 'package:app_flutter/features/topology/topology_map.dart' show TopologyDa
 /// schema creation is performed here. All reads hit the database
 /// directly — results are NOT cached.
 class SqliteDataSource implements DataSource {
-  SqliteDataSource(this._db);
+    SqliteDataSource(this._db);
   final Database _db;
   final StreamController<Map<String, dynamic>> _propertiesController =
       StreamController<Map<String, dynamic>>.broadcast();
 
   @override
   String get name => 'sqlite';
+
+  @override
+  Future<void> dispose() async {
+    await _propertiesController.close();
+    await _db.close();
+  }
 
   /// Reads all type definitions from the `type_definitions` table and
   /// hydrates each row into a [TypeDescriptor] by joining into

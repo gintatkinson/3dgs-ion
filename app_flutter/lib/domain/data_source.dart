@@ -81,5 +81,11 @@ abstract class DataSource {
 
   /// Fetches all active nodes and links for topology mapping.
   Future<TopologyData> fetchTopologyData();
+
+  /// Releases all resources held by this data source.
+  ///
+  /// After calling [dispose], the data source is no longer usable.
+  /// Callers must resolve a new [DataSource] instance instead.
+  Future<void> dispose();
 }
 

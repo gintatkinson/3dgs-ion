@@ -67,6 +67,9 @@ class _MockDataSource implements DataSource {
 
   @override
   Future<TopologyData> fetchTopologyData() async => const TopologyData(coordinateMapping: {}, nodes: [], links: []);
+
+  @override
+  Future<void> dispose() async {}
 }
 
 

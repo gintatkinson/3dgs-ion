@@ -31,6 +31,8 @@ class RepositoryResolver {
   static const _defaultEmulatorHost = 'localhost';
   static const _defaultEmulatorPort = 8080;
 
+  static DataSource? _lastResolved;
+
   /// Resolves and initialises the appropriate backend.
   ///
   /// Determines the backend type from (in priority order):
@@ -67,20 +69,24 @@ class RepositoryResolver {
       } catch (_) {}
     }
 
+    await _lastResolved?.dispose();
+    final DataSource resolved;
     switch (type) {
       case 'firebase':
-        return _createFirebaseAdapter(useEmulator: useEmulator);
+        resolved = await _createFirebaseAdapter(useEmulator: useEmulator);
       case 'sqlite':
-        return _createSqliteAdapter(
+        resolved = await _createSqliteAdapter(
           dbAssetPath: dbAssetPath,
           inMemory: sqliteInMemory,
         );
       default:
-        return _createSqliteAdapter(
+        resolved = await _createSqliteAdapter(
           dbAssetPath: dbAssetPath,
           inMemory: sqliteInMemory,
         );
     }
+    _lastResolved = resolved;
+    return resolved;
   }
 
   /// Initialies Firebase and returns a Firestore-backed DataSource.

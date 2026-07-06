@@ -464,5 +464,10 @@ class FirebaseDataSource implements DataSource {
       return const TopologyData(coordinateMapping: {}, nodes: [], links: []);
     }
   }
+
+  @override
+  Future<void> dispose() async {
+    await _propertiesController.close();
+  }
 }
 
