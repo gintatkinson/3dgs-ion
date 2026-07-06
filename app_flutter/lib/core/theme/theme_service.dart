@@ -54,11 +54,18 @@ class SharedPreferencesThemeService implements ThemeService {
   static const _layoutSplitAxisKey = 'layout_split_axis';
   static const _panelOpacityKey = 'panel_opacity';
 
+  SharedPreferences? _cachedPrefs;
+
+  Future<SharedPreferences> _getPrefs() async {
+    _cachedPrefs ??= await SharedPreferences.getInstance();
+    return _cachedPrefs!;
+  }
+
   /// Reads the theme-mode string; unknown values fall back to system.
   @override
   Future<ThemeMode> loadThemeMode() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = await _getPrefs();
       final value = prefs.getString(_modeKey);
       switch (value) {
         case 'light': return ThemeMode.light;
@@ -75,7 +82,7 @@ class SharedPreferencesThemeService implements ThemeService {
   @override
   Future<void> saveThemeMode(ThemeMode themeMode) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = await _getPrefs();
       final value = themeMode == ThemeMode.light ? 'light'
           : themeMode == ThemeMode.dark ? 'dark'
           : 'system';
@@ -89,7 +96,7 @@ class SharedPreferencesThemeService implements ThemeService {
   @override
   Future<int> loadThemeScheme() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = await _getPrefs();
       return prefs.getInt(_schemeKey) ?? 0;
     } catch (e, stackTrace) {
       debugPrint('Error in loadThemeScheme: $e\n$stackTrace');
@@ -101,7 +108,7 @@ class SharedPreferencesThemeService implements ThemeService {
   @override
   Future<void> saveThemeScheme(int index) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = await _getPrefs();
       await prefs.setInt(_schemeKey, index);
     } catch (e, stackTrace) {
       debugPrint('Error in saveThemeScheme: $e\n$stackTrace');
@@ -112,7 +119,7 @@ class SharedPreferencesThemeService implements ThemeService {
   @override
   Future<double> loadTextScale() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = await _getPrefs();
       return prefs.getDouble(_textScaleKey) ?? 1.0;
     } catch (e, stackTrace) {
       debugPrint('Error in loadTextScale: $e\n$stackTrace');
@@ -124,7 +131,7 @@ class SharedPreferencesThemeService implements ThemeService {
   @override
   Future<void> saveTextScale(double scale) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = await _getPrefs();
       await prefs.setDouble(_textScaleKey, scale);
     } catch (e, stackTrace) {
       debugPrint('Error in saveTextScale: $e\n$stackTrace');
@@ -135,7 +142,7 @@ class SharedPreferencesThemeService implements ThemeService {
   @override
   Future<Axis> loadLayoutSplitAxis() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = await _getPrefs();
       final value = prefs.getString(_layoutSplitAxisKey);
       switch (value) {
         case 'vertical':
@@ -155,7 +162,7 @@ class SharedPreferencesThemeService implements ThemeService {
   @override
   Future<void> saveLayoutSplitAxis(Axis axis) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = await _getPrefs();
       final value = axis == Axis.vertical ? 'vertical' : 'horizontal';
       await prefs.setString(_layoutSplitAxisKey, value);
     } catch (e, stackTrace) {
@@ -166,7 +173,7 @@ class SharedPreferencesThemeService implements ThemeService {
   @override
   Future<double> loadPanelOpacity() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = await _getPrefs();
       return prefs.getDouble(_panelOpacityKey) ?? 0.85;
     } catch (e, stackTrace) {
       debugPrint('Error in loadPanelOpacity: $e\n$stackTrace');
@@ -177,7 +184,7 @@ class SharedPreferencesThemeService implements ThemeService {
   @override
   Future<void> savePanelOpacity(double opacity) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = await _getPrefs();
       await prefs.setDouble(_panelOpacityKey, opacity);
     } catch (e, stackTrace) {
       debugPrint('Error in savePanelOpacity: $e\n$stackTrace');

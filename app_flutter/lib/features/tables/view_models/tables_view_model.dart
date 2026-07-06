@@ -119,6 +119,11 @@ class TablesViewModel extends ChangeNotifier {
   Future<void> loadForNode(String nodeId) async {
     final requestId = ++_requestId;
     _activeView = nodeId;
+    _tabs = [];
+    _selectedTabId = null;
+    _headers = [];
+    _rows = [];
+    _columnModels = [];
     _loading = true;
     _error = null;
     notifyListeners();
@@ -247,7 +252,8 @@ class TablesViewModel extends ChangeNotifier {
         _cache.clear();
         if (_tabs.isNotEmpty && _selectedTabId != null) {
           final tab = _tabs.firstWhere((t) => t.id == _selectedTabId);
-          _loadData(tab, _requestId);
+          final requestId = ++_requestId;
+          _loadData(tab, requestId);
         }
       },
       onError: (Object e) {
