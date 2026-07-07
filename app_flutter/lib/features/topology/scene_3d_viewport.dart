@@ -1727,11 +1727,12 @@ class Scene3DViewportPainter extends CustomPainter {
 
       // Project the node
       double finalHeight = orbitHeight;
-      if (type == 'ground') {
-        final double terrainElev = getElevation(latDeg, currentLng * 180.0 / math.pi);
-        finalHeight = 6378137.0 + terrainElev * 80.0 + alt * 2000.0;
-      } else if (type == 'underwater') {
-        finalHeight = 6378137.0 + alt; // Keep underwater depth flat/as-is
+      if (type == 'ground' || type == 'underwater') {
+        if (elevationActive) {
+          finalHeight = 6378137.0 + alt * 80.0;
+        } else {
+          finalHeight = 6378137.0 + alt;
+        }
       }
       final proj = project(lat, currentLng, finalHeight, center, rotationAngle, tilt, size);
       
