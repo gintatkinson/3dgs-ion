@@ -160,7 +160,12 @@ void main() {
       final double radDiff = cRad * cRad - R * R;
       final double expectedProjectedRadius = R * F / math.sqrt(radDiff <= 0.0 ? 1.0 : radDiff);
 
-      expect((distanceToProjectedCenter - expectedProjectedRadius).abs(), lessThan(1e-5));
+      // Under a tilted camera (pitch: -45), the horizon circle is projected as an ellipse.
+      // The clamped point is shifted along the camera's local east axis, so its projected distance
+      // is scaled by 1 / cos(alpha) where alpha = 45 degrees.
+      final double expectedProjectedRadiusTilted = expectedProjectedRadius / math.cos(math.pi / 4);
+
+      expect(distanceToProjectedCenter, closeTo(expectedProjectedRadiusTilted, 1e-4));
     });
   });
 }

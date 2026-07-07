@@ -1133,6 +1133,32 @@ class Scene3DViewportPainter extends CustomPainter {
     final double cy = cRad * math.cos(radLat) * math.sin(radLng);
     final double cz = cRad * math.sin(radLat);
 
+    // 3D ECEF Horizon Culling check
+    final double dotPC = px * cx + py * cy + pz * cz;
+    final bool isCulled = dotPC < R * R;
+
+    if (isCulled) {
+      final double d2 = cRad * cRad;
+      final double r2_over_d2 = (R * R) / d2;
+      final double parX = r2_over_d2 * cx;
+      final double parY = r2_over_d2 * cy;
+      final double parZ = r2_over_d2 * cz;
+
+      final double dot_over_d2 = dotPC / d2;
+      final double perpX = px - dot_over_d2 * cx;
+      final double perpY = py - dot_over_d2 * cy;
+      final double perpZ = pz - dot_over_d2 * cz;
+
+      final double perpLen = math.sqrt(perpX * perpX + perpY * perpY + perpZ * perpZ);
+      if (perpLen > 0.0) {
+        final double rHorizon = R * math.sqrt(1.0 - (R * R) / d2);
+        final double scale = rHorizon / perpLen;
+        px = parX + perpX * scale;
+        py = parY + perpY * scale;
+        pz = parZ + perpZ * scale;
+      }
+    }
+
     // Camera local ENU basis
     final double ux = math.cos(radLat) * math.cos(radLng);
     final double uy = math.cos(radLat) * math.sin(radLng);
@@ -1176,17 +1202,6 @@ class Scene3DViewportPainter extends CustomPainter {
     // Optical axis is along negative z_cam
     final double depth = -z_cam;
 
-    // Horizon culling check using vector-based segment-sphere intersection
-    final double distSq = rx * rx + ry * ry + rz * rz;
-    final double dotCV = cx * rx + cy * ry + cz * rz;
-    final double t = -dotCV / distSq;
-    bool isCulled = false;
-    if (t > 0.0 && t < 1.0) {
-      final double closeSq = (cx * cx + cy * cy + cz * cz) - (dotCV * dotCV) / distSq;
-      if (closeSq < R * R) {
-        isCulled = true;
-      }
-    }
     // Focal length (45-degree FOV)
     final double F = size.shortestSide * 1.2;
     final double pScale = depth <= 0.0 ? 1.0 : F / depth;
@@ -1194,49 +1209,92 @@ class Scene3DViewportPainter extends CustomPainter {
     final double rx_pixel = x_cam * pScale;
     final double ry_pixel = y_cam * pScale;
 
-    double depthVal = depth;
-    Offset projectedOffset = Offset(center.dx + rx_pixel, center.dy - ry_pixel);
-
-    if (isCulled) {
-      depthVal = -1.0;
-      final double radDiff = cRad * cRad - R * R;
-      final double projectedRadius = R * F / math.sqrt(radDiff <= 0.0 ? 1.0 : radDiff);
-
-      // Project the Earth's center (0,0,0) in ECEF onto the camera viewport to find the screen coordinate of the Earth's center
-      final double rxc = -cx;
-      final double ryc = -cy;
-      final double rzc = -cz;
-
-      final double x_enuc = rxc * ex + ryc * ey + rzc * ez;
-      final double y_enuc = rxc * nx + ryc * ny + rzc * nz;
-      final double z_enuc = rxc * ux + ryc * uy + rzc * uz;
-
-      final double x1c = x_enuc * cosH + y_enuc * sinH;
-      final double y1c = -x_enuc * sinH + y_enuc * cosH;
-      final double z1c = z_enuc;
-
-      final double x_camc = x1c;
-      final double y_camc = y1c * cosA - z1c * sinA;
-      final double z_camc = y1c * sinA + z1c * cosA;
-
-      final double depthc = -z_camc;
-      final double pScalec = depthc <= 0.0 ? 1.0 : F / depthc;
-
-      final double rx_pixelc = x_camc * pScalec;
-      final double ry_pixelc = y_camc * pScalec;
-
-      final Offset earthCenterScreen = Offset(center.dx + rx_pixelc, center.dy - ry_pixelc);
-
-      final double dx = projectedOffset.dx - earthCenterScreen.dx;
-      final double dy = projectedOffset.dy - earthCenterScreen.dy;
-      final double dist = math.sqrt(dx * dx + dy * dy);
-      if (dist > 0.0) {
-        final double scale = projectedRadius / dist;
-        projectedOffset = Offset(earthCenterScreen.dx + dx * scale, earthCenterScreen.dy + dy * scale);
-      }
-    }
+    final double depthVal = isCulled ? -1.0 : depth;
+    final Offset projectedOffset = Offset(center.dx + rx_pixel, center.dy - ry_pixel);
 
     return ProjectedPoint(projectedOffset, depthVal);
+  }
+
+  Path _getHorizonPath(Size size, Offset center, double rotationAngle, double tilt) {
+    final double R = 6378137.0;
+    final double cRad = R + camera.altitude;
+    final double d2 = cRad * cRad;
+
+    final double radLng = -rotationAngle;
+    final double radLat = -tilt;
+    final double cx = cRad * math.cos(radLat) * math.cos(radLng);
+    final double cy = cRad * math.cos(radLat) * math.sin(radLng);
+    final double cz = cRad * math.sin(radLat);
+
+    final double ux = math.cos(radLat) * math.cos(radLng);
+    final double uy = math.cos(radLat) * math.sin(radLng);
+    final double uz = math.sin(radLat);
+
+    final double ex = -math.sin(radLng);
+    final double ey = math.cos(radLng);
+    final double ez = 0.0;
+
+    final double nx = -math.sin(radLat) * math.cos(radLng);
+    final double ny = -math.sin(radLat) * math.sin(radLng);
+    final double nz = math.cos(radLat);
+
+    final double r2_over_d2 = (R * R) / d2;
+    final double cx_h = r2_over_d2 * cx;
+    final double cy_h = r2_over_d2 * cy;
+    final double cz_h = r2_over_d2 * cz;
+
+    final double rHorizon = R * math.sqrt(1.0 - (R * R) / d2);
+
+    final Path path = Path();
+    const int segments = 64;
+    for (int i = 0; i <= segments; i++) {
+      final double theta = 2.0 * math.pi * i / segments;
+      final double cosT = math.cos(theta);
+      final double sinT = math.sin(theta);
+
+      final double px = cx_h + rHorizon * (cosT * ex + sinT * nx);
+      final double py = cy_h + rHorizon * (cosT * ey + sinT * ny);
+      final double pz = cz_h + rHorizon * (cosT * ez + sinT * nz);
+
+      final double rx = px - cx;
+      final double ry = py - cy;
+      final double rz = pz - cz;
+
+      final double x_enu = rx * ex + ry * ey + rz * ez;
+      final double y_enu = rx * nx + ry * ny + rz * nz;
+      final double z_enu = rx * ux + ry * uy + rz * uz;
+
+      final double H_rad = camera.heading * math.pi / 180.0;
+      final double alpha = (camera.pitch + 90.0) * math.pi / 180.0;
+
+      final double cosH = math.cos(H_rad);
+      final double sinH = math.sin(H_rad);
+      final double cosA = math.cos(alpha);
+      final double sinA = math.sin(alpha);
+
+      final double x1 = x_enu * cosH + y_enu * sinH;
+      final double y1 = -x_enu * sinH + y_enu * cosH;
+      final double z1 = z_enu;
+
+      final double x_cam = x1;
+      final double y_cam = y1 * cosA - z1 * sinA;
+      final double z_cam = y1 * sinA + z1 * cosA;
+
+      final double depth = -z_cam;
+      final double F = size.shortestSide * 1.2;
+      final double pScale = depth <= 0.0 ? 1.0 : F / depth;
+
+      final double rx_pixel = x_cam * pScale;
+      final double ry_pixel = y_cam * pScale;
+
+      final Offset pt = Offset(center.dx + rx_pixel, center.dy - ry_pixel);
+      if (i == 0) {
+        path.moveTo(pt.dx, pt.dy);
+      } else {
+        path.lineTo(pt.dx, pt.dy);
+      }
+    }
+    return path;
   }
 
   // Convert degrees to radians
@@ -1247,6 +1305,14 @@ class Scene3DViewportPainter extends CustomPainter {
     // Shift center to the left to give space to the config overlay sidebar
     final Offset center = Offset(size.width * 0.45, size.height * 0.5);
 
+    // Rotation angle and tilt based on camera and user inputs
+    final double baseRotation = -_rad(camera.longitude);
+    final double baseTilt = -_rad(camera.latitude);
+    final double rotationAngle = baseRotation + userRotationX;
+    final double tilt = baseTilt + userTilt;
+
+    final Path oceanPath = _getHorizonPath(size, center, rotationAngle, tilt);
+
     // In paint, calculate the projected Earth center and visual radius dynamically
     final ProjectedPoint earthCenterProj = project(0.0, 0.0, 0.0, center, 0.0, 0.0, size);
     final Offset projectedCenter = earthCenterProj.offset;
@@ -1255,6 +1321,14 @@ class Scene3DViewportPainter extends CustomPainter {
     final double F = size.shortestSide * 1.2;
     final double radDiff = cRad * cRad - 6378137.0 * 6378137.0;
     final double projectedRadius = 6378137.0 * F / math.sqrt(radDiff <= 0.0 ? 1.0 : radDiff);
+
+    Path _getScaledPath(double scaleFactor) {
+      final Matrix4 scaleMatrix = Matrix4.identity();
+      scaleMatrix.translate(projectedCenter.dx, projectedCenter.dy);
+      scaleMatrix.scale(scaleFactor);
+      scaleMatrix.translate(-projectedCenter.dx, -projectedCenter.dy);
+      return oceanPath.transform(scaleMatrix.storage);
+    }
 
     // 1. Draw Starry Space Background (~100 stars)
     final math.Random rand = math.Random(42);
@@ -1278,7 +1352,7 @@ class Scene3DViewportPainter extends CustomPainter {
             Color(0x00000000),
           ],
         ).createShader(Rect.fromCircle(center: projectedCenter, radius: projectedRadius * 1.8));
-      canvas.drawCircle(projectedCenter, projectedRadius * 1.8, coronaPaint1);
+      canvas.drawPath(_getScaledPath(1.8), coronaPaint1);
 
       final Paint coronaPaint2 = Paint()
         ..shader = RadialGradient(
@@ -1288,7 +1362,7 @@ class Scene3DViewportPainter extends CustomPainter {
             Color(0x00000000),
           ],
         ).createShader(Rect.fromCircle(center: projectedCenter, radius: projectedRadius * 1.45));
-      canvas.drawCircle(projectedCenter, projectedRadius * 1.45, coronaPaint2);
+      canvas.drawPath(_getScaledPath(1.45), coronaPaint2);
     } else if (astronomicalBody == 'Mars') {
       // Dusty reddish-orange atmospheric glow
       final Paint marsAtmosphere = Paint()
@@ -1299,7 +1373,7 @@ class Scene3DViewportPainter extends CustomPainter {
             Color(0x00000000),
           ],
         ).createShader(Rect.fromCircle(center: projectedCenter, radius: projectedRadius * 1.35));
-      canvas.drawCircle(projectedCenter, projectedRadius * 1.35, marsAtmosphere);
+      canvas.drawPath(_getScaledPath(1.35), marsAtmosphere);
     } else {
       // Earth: Glowing atmospheric blue/cyan radial glow
       final Paint atmospherePaint = Paint()
@@ -1311,7 +1385,7 @@ class Scene3DViewportPainter extends CustomPainter {
           ],
           stops: const [0.0, 0.7, 1.0],
         ).createShader(Rect.fromCircle(center: projectedCenter, radius: projectedRadius * 1.35));
-      canvas.drawCircle(projectedCenter, projectedRadius * 1.35, atmospherePaint);
+      canvas.drawPath(_getScaledPath(1.35), atmospherePaint);
     }
 
     // 3. Earth's / astronomical sphere style variables
@@ -1351,13 +1425,7 @@ class Scene3DViewportPainter extends CustomPainter {
       ..shader = RadialGradient(
         colors: oceanColors,
       ).createShader(Rect.fromCircle(center: projectedCenter, radius: projectedRadius));
-    canvas.drawCircle(projectedCenter, projectedRadius, spherePaint);
-
-    // Rotation angle and tilt based on camera and user inputs
-    final double baseRotation = -_rad(camera.longitude);
-    final double baseTilt = -_rad(camera.latitude);
-    final double rotationAngle = baseRotation + userRotationX;
-    final double tilt = baseTilt + userTilt;
+    canvas.drawPath(oceanPath, spherePaint);
 
     // 5. Draw Grid lines (Meridians & Parallels) - front hemisphere only
     _gridPaint.color = gridColor;

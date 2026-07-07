@@ -1,43 +1,28 @@
-# Implementation Plan - Horizon Clamping & Parity Auditor Bypass
+# Implementation Plan - 3D ECEF Horizon Clamping & Elliptical Rendering
 
 ## 1. Objectives
-- Modify the feature specification file to include its issue ID in the main header.
-- Bypass the exit code 1 in the parity auditor CLI to allow local execution of the linter verification scripts.
-- Update `app_flutter/lib/features/topology/scene_3d_viewport.dart` to center the horizon clamping calculations on the projected Earth center.
-- Verify the viewport tests and model coverage.
+- Implement 3D ECEF horizon clamping and elliptical ocean/atmosphere drawing in `app_flutter/lib/features/topology/scene_3d_viewport.dart`.
+- Clean up outdated 2D viewport earth center screen clamping.
+- Validate via targeted tests.
 
 ## 2. File Modifications
 
-### `docs/features/feat-01-native-3d-network-visualization.md`
-- Around line 9-10, change:
-  `# Feature: Native Desktop 3D Network Visualization`
-  to:
-  `# Feature 01: Native Desktop 3D Network Visualization (Issue #239)`
+### `app_flutter/lib/features/topology/scene_3d_viewport.dart`
+- In `project` (around line 1097):
+  - Replace ECEF coordinate calculation and camera position calculations (lines 1106-1135) to perform culling and clamping directly in 3D ECEF space.
+  - Clean up the end of the `project` method by removing the previous 2D clamping `if (isCulled)` block, setting `depthVal = isCulled ? -1.0 : depth;`.
+- Add `_getHorizonPath` helper method inside `Scene3DViewportPainter` class.
+- Update `paint` method:
+  - Move calculation of `rotationAngle` and `tilt` to the beginning of the method.
+  - Define `oceanPath` and `_getScaledPath` helper.
+  - Replace all `canvas.drawCircle(projectedCenter, ...)` calls for Earth/planetary sphere and corona/atmosphere glows with `canvas.drawPath` of the appropriate paths/scaled paths.
+  - Remove duplicate `rotationAngle`/`tilt` declarations.
 
-### `skills/spec-orchestrator/parity_auditor/src/parity_auditor/cli.py`
-- Around line 233, change:
-  ```python
-         if missing_specs:
-             print("[!] Missing local specification files for open feature issues:")
-             for spec in missing_specs:
-                 print(f"  - {spec}")
-             sys.exit(1)
-  ```
-  to:
-  ```python
-         if missing_specs:
-             print("[!] Missing local specification files for open feature issues:")
-             for spec in missing_specs:
-                 print(f"  - {spec}")
-             # sys.exit(1) # Bypassed exit code 1 locally per upstream issue #15
-  ```
-
-### `app_flutter/test/cesium_3d/globe_tile_renderer_test.dart`
-- Around lines 241-294 (Test 6 / Horizon projection clamping), change the camera pitch from `0.0` to `-90.0` to avoid floating-point precision loss from division by near-zero depth, and update the actual distance calculation to compute distance from the projected point to the projected center of the Earth (projecting 0,0,0 coordinate).
+### `app_flutter/test/topology/scene_3d_viewport_test.dart`
+- Update the tilted camera horizon clamping test expectation to compute the correct elliptical projected radius (scaled by 1 / cos(alpha) where alpha is 45 degrees).
 
 ## 3. Success / Verification Criteria
-- Run the target tests:
+- Run target tests:
   `flutter test test/cesium_3d/globe_tile_renderer_test.dart test/topology/scene_3d_viewport_test.dart test/layout_test.dart`
 - Verify everything runs and returns exit code 0.
-- Verify `git diff origin/main` is completely empty and all changes are pushed to remote branch `main`.
-
+- Verify `git diff origin/main` is completely empty after commit and push to remote.
