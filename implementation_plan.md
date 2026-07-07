@@ -1,19 +1,32 @@
-# Implementation Plan - Update Native 3D Network Visualization Design Specification
+# Implementation Plan - Trailing Pane Explicit Sizing
 
 ## 1. Objectives
-Update the design specification file `docs/features/feat-01-native-3d-network-visualization.md` to track a new defect, commit and push to GitHub, and update GitHub issue #239.
+Modify `app_flutter/lib/features/layout/split_workspace.dart` to calculate and apply explicit non-negative dimensions (`width` and `height`) for the trailing pane Positioned widget. This prevents negative sizing crashes on window resize when the remaining space drops below zero.
 
 ## 2. File Modifications
 
-### `docs/features/feat-01-native-3d-network-visualization.md`
-- Append the following defect to the "Tracked Defects" section at the end of the file:
-  ```markdown
-  - [ ] #242 - BUG: SplitWorkspace negative width/height layout constraints cause Flutter crashes on window resize
-  ```
+### `app_flutter/lib/features/layout/split_workspace.dart`
+- Around lines 195-201, replace the `trailingWidget` declaration with:
+```dart
+        final double? trailingWidth = isHorizontal
+            ? math.max(0.0, totalSize - clampedFirstPane - widget.dividerSize)
+            : null;
+        final double? trailingHeight = isHorizontal
+            ? null
+            : math.max(0.0, totalSize - clampedFirstPane - widget.dividerSize);
+
+        final trailingWidget = Positioned(
+          left: isHorizontal ? clampedFirstPane + widget.dividerSize : 0,
+          right: isHorizontal ? null : 0,
+          top: isHorizontal ? 0 : clampedFirstPane + widget.dividerSize,
+          bottom: isHorizontal ? 0 : null,
+          width: trailingWidth,
+          height: trailingHeight,
+          child: trailingPane,
+        );
+```
 
 ## 3. Success / Verification Criteria
-- Verify `docs/features/feat-01-native-3d-network-visualization.md` ends with the new tracked defect line.
-- Commit the change with a descriptive commit message.
-- Push the change to GitHub.
-- Update GitHub issue #239 using `gh issue edit 239 --body-file docs/features/feat-01-native-3d-network-visualization.md`.
-- Verify `git diff origin/main` is empty.
+- Run unit tests using `flutter test` and confirm they compile and pass.
+- Commit the changes and push them to the GitHub `main` branch.
+- Verify `git diff origin/main` is completely empty.
