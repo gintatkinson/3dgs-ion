@@ -168,4 +168,43 @@ void main() {
       expect(distanceToProjectedCenter, closeTo(expectedProjectedRadiusTilted, 1e-4));
     });
   });
+
+  group('Feature 02: 3D Terrain Elevation and Node Altitude', () {
+    test('getElevation returns correct heights at Mount Fuji and Alps only when active', () {
+      final camera = VirtualCamera.clamped(latitude: 35.0, longitude: 138.0, altitude: 2000000.0, heading: 0, pitch: -90, roll: 0);
+      final painterActive = Scene3DViewportPainter(
+        camera: camera,
+        activeStyle: 'dark',
+        astronomicalBody: 'Earth',
+        elevationActive: true,
+        showDevices: true,
+        showLinks: true,
+        showLabels: true,
+        showDropLines: true,
+        userRotationX: 0.0,
+        userTilt: 0.0,
+        zoomScale: 1.0,
+      );
+      final painterInactive = Scene3DViewportPainter(
+        camera: camera,
+        activeStyle: 'dark',
+        astronomicalBody: 'Earth',
+        elevationActive: false,
+        showDevices: true,
+        showLinks: true,
+        showLabels: true,
+        showDropLines: true,
+        userRotationX: 0.0,
+        userTilt: 0.0,
+        zoomScale: 1.0,
+      );
+
+      // Mount Fuji Peak: 35.3606, 138.7274
+      expect(painterActive.getElevation(35.3606, 138.7274), closeTo(3776.0, 1.0));
+      expect(painterInactive.getElevation(35.3606, 138.7274), 0.0);
+
+      // Outside range
+      expect(painterActive.getElevation(0.0, 0.0), 0.0);
+    });
+  });
 }

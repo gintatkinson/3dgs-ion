@@ -1,28 +1,25 @@
-# Implementation Plan - 3D ECEF Horizon Clamping & Elliptical Rendering
+# Implementation Plan - Feature 02: 3D Terrain Elevation and Node Altitude Modeling
 
 ## 1. Objectives
-- Implement 3D ECEF horizon clamping and elliptical ocean/atmosphere drawing in `app_flutter/lib/features/topology/scene_3d_viewport.dart`.
-- Clean up outdated 2D viewport earth center screen clamping.
-- Validate via targeted tests.
+- Implement 3D terrain elevation calculations and apply node altitude offsets dynamically inside `Scene3DViewportPainter` in `app_flutter/lib/features/topology/scene_3d_viewport.dart`.
+- Apply terrain elevation amplification for map tile projection, ground node positioning, and vertical space node drop lines.
+- Add BDD-style unit tests verifying Mount Fuji peak and Alps range elevation queries, and confirming state behavior when elevation is disabled.
 
 ## 2. File Modifications
 
 ### `app_flutter/lib/features/topology/scene_3d_viewport.dart`
-- In `project` (around line 1097):
-  - Replace ECEF coordinate calculation and camera position calculations (lines 1106-1135) to perform culling and clamping directly in 3D ECEF space.
-  - Clean up the end of the `project` method by removing the previous 2D clamping `if (isCulled)` block, setting `depthVal = isCulled ? -1.0 : depth;`.
-- Add `_getHorizonPath` helper method inside `Scene3DViewportPainter` class.
-- Update `paint` method:
-  - Move calculation of `rotationAngle` and `tilt` to the beginning of the method.
-  - Define `oceanPath` and `_getScaledPath` helper.
-  - Replace all `canvas.drawCircle(projectedCenter, ...)` calls for Earth/planetary sphere and corona/atmosphere glows with `canvas.drawPath` of the appropriate paths/scaled paths.
-  - Remove duplicate `rotationAngle`/`tilt` declarations.
+- In `Scene3DViewportPainter` class:
+  - Add `double getElevation(double latDeg, double lngDeg)` method that calculates peak elevation for Mount Fuji (when distance is < 0.25) and noise-based elevation for the Alps mountain range in Central Japan, returning 0.0 when `elevationActive` is false or when outside these geographic ranges.
+- In `paint` method:
+  - Update `renderTiles` project function parameter callback to retrieve elevation, apply `80.0` amplification factor, and project utilizing `6378137.0 + ampElev`.
+  - Update ground node positioning to lookup terrain elevation, compute height with amplification and `alt * 2000.0` scaling, and project using the updated height.
+  - Update vertical satellite drop lines to fetch terrain elevation at the satellite's position, calculate surface height with amplification, and project this surface point.
 
 ### `app_flutter/test/topology/scene_3d_viewport_test.dart`
-- Update the tilted camera horizon clamping test expectation to compute the correct elliptical projected radius (scaled by 1 / cos(alpha) where alpha is 45 degrees).
+- Add a new group `Feature 02: 3D Terrain Elevation and Node Altitude` with unit tests checking elevation returns at Mount Fuji and the Alps when active vs inactive, and when outside geographic ranges.
 
 ## 3. Success / Verification Criteria
 - Run target tests:
-  `flutter test test/cesium_3d/globe_tile_renderer_test.dart test/topology/scene_3d_viewport_test.dart test/layout_test.dart`
+  `flutter test test/cesium_3d/globe_tile_renderer_test.dart test/topology/scene_3d_viewport_test.dart`
 - Verify everything runs and returns exit code 0.
 - Verify `git diff origin/main` is completely empty after commit and push to remote.

@@ -1215,6 +1215,30 @@ class Scene3DViewportPainter extends CustomPainter {
     return ProjectedPoint(projectedOffset, depthVal);
   }
 
+  double getElevation(double latDeg, double lngDeg) {
+    if (!elevationActive) return 0.0;
+
+    // Mount Fuji peak: 35.3606° N, 138.7274° E
+    final double dLat = latDeg - 35.3606;
+    final double dLng = lngDeg - 138.7274;
+    final double distSq = dLat * dLat + dLng * dLng;
+
+    double elev = 0.0;
+    final double fujiDist = math.sqrt(distSq);
+    if (fujiDist < 0.25) {
+      elev += 3776.0 * math.exp(-fujiDist * fujiDist / (0.04 * 0.04));
+    }
+
+    // Alps mountain range around central Japan: 34.5° N - 37.5° N, 136.0° E - 140.0° E
+    if (latDeg > 34.5 && latDeg < 37.5 && lngDeg > 136.0 && lngDeg < 140.0) {
+      final double rangeNoise = math.sin(latDeg * 12.0) * math.cos(lngDeg * 12.0) * 1200.0 +
+                               math.sin(latDeg * 25.0) * math.sin(lngDeg * 25.0) * 400.0;
+      elev += math.max(0.0, rangeNoise);
+    }
+
+    return elev;
+  }
+
   Path _getHorizonPath(Size size, Offset center, double rotationAngle, double tilt) {
     final double R = 6378137.0;
     final double cRad = R + camera.altitude;
@@ -1548,15 +1572,19 @@ class Scene3DViewportPainter extends CustomPainter {
         size,
         center,
         6378137.0,
-        (double latDeg, double lngDeg) => project(
-          _rad(latDeg),
-          _rad(lngDeg),
-          6378137.0,
-          center,
-          rotationAngle,
-          tilt,
-          size,
-        ),
+        (double latDeg, double lngDeg) {
+          final double elev = getElevation(latDeg, lngDeg);
+          final double ampElev = elev * 80.0;
+          return project(
+            _rad(latDeg),
+            _rad(lngDeg),
+            6378137.0 + ampElev,
+            center,
+            rotationAngle,
+            tilt,
+            size,
+          );
+        },
       );
     }
 
@@ -1698,14 +1726,23 @@ class Scene3DViewportPainter extends CustomPainter {
       }
 
       // Project the node
-      final proj = project(lat, currentLng, orbitHeight, center, rotationAngle, tilt, size);
+      double finalHeight = orbitHeight;
+      if (type == 'ground') {
+        final double terrainElev = getElevation(latDeg, currentLng * 180.0 / math.pi);
+        finalHeight = 6378137.0 + terrainElev * 80.0 + alt * 2000.0;
+      } else if (type == 'underwater') {
+        finalHeight = 6378137.0 + alt; // Keep underwater depth flat/as-is
+      }
+      final proj = project(lat, currentLng, finalHeight, center, rotationAngle, tilt, size);
       
       if (proj.z >= 0) {
         allProjectedNodes[id] = proj;
 
         // Draw vertical drop line from satellite to surface
         if (type == 'space' && showDropLines) {
-          final surfaceProj = project(lat, currentLng, 6378137.0, center, rotationAngle, tilt, size);
+          final double terrainElev = getElevation(latDeg, currentLng * 180.0 / math.pi);
+          final double surfaceHeight = 6378137.0 + terrainElev * 80.0;
+          final surfaceProj = project(lat, currentLng, surfaceHeight, center, rotationAngle, tilt, size);
 
           const int dashes = 10;
           for (int d = 0; d < dashes; d++) {
