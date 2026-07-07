@@ -244,7 +244,7 @@ void main() {
         longitude: 0.0,
         altitude: 500000.0, // 500,000m
         heading: 0.0,
-        pitch: 0.0,
+        pitch: -90.0,
         roll: 0.0,
       );
 
@@ -278,12 +278,24 @@ void main() {
         size,
       );
 
+      // Project the Earth's center (0,0,0) in ECEF under the same settings to find the expected projected center
+      final earthCenterProj = painter.project(
+        0.0,
+        0.0,
+        0.0, // height = 0 is center
+        center,
+        0.0,
+        0.0,
+        size,
+      );
+      final Offset projectedCenter = earthCenterProj.offset;
+
       const double R = 6378137.0;
       final double cRad = R + 500000.0;
-      final double F = size.shortestSide * 1.2; // 600.0 * 1.2 = 720.0
+      final double F = size.shortestSide * 1.2;
       final double projectedRadius = R * F / math.sqrt(cRad * cRad - R * R);
 
-      final double actualDistance = (projectedPoint.offset - center).distance;
+      final double actualDistance = (projectedPoint.offset - projectedCenter).distance;
 
       // Assert z is equal to -1.0 (culled status)
       expect(projectedPoint.z, equals(-1.0));

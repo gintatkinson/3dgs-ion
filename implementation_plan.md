@@ -32,13 +32,12 @@
              # sys.exit(1) # Bypassed exit code 1 locally per upstream issue #15
   ```
 
-### `app_flutter/lib/features/topology/scene_3d_viewport.dart`
-- In the `project` method, update the `isCulled` culling block to calculate and use `earthCenterScreen` (the screen coordinate of the Earth's center ECEF 0,0,0) as the reference for horizon clamping, instead of using the raw viewport center.
+### `app_flutter/test/cesium_3d/globe_tile_renderer_test.dart`
+- Around lines 241-294 (Test 6 / Horizon projection clamping), change the camera pitch from `0.0` to `-90.0` to avoid floating-point precision loss from division by near-zero depth, and update the actual distance calculation to compute distance from the projected point to the projected center of the Earth (projecting 0,0,0 coordinate).
 
 ## 3. Success / Verification Criteria
-- Run the viewport tests inside `app_flutter`:
-  `flutter test test/topology/scene_3d_viewport_test.dart`
-- Run the model coverage linter command:
-  `python3 skills/spec-orchestrator/scripts/verify_model_coverage.py app_flutter/assets docs/features`
+- Run the target tests:
+  `flutter test test/cesium_3d/globe_tile_renderer_test.dart test/topology/scene_3d_viewport_test.dart test/layout_test.dart`
 - Verify everything runs and returns exit code 0.
 - Verify `git diff origin/main` is completely empty and all changes are pushed to remote branch `main`.
+
