@@ -1,32 +1,21 @@
-# Implementation Plan - Trailing Pane Explicit Sizing
+# Implementation Plan - 3D Visualization Epic Specification
 
 ## 1. Objectives
-Modify `app_flutter/lib/features/layout/split_workspace.dart` to calculate and apply explicit non-negative dimensions (`width` and `height`) for the trailing pane Positioned widget. This prevents negative sizing crashes on window resize when the remaining space drops below zero.
+Create the parent Epic specification file `docs/epics/epic-01-3d-visualization.md` and link it to the child feature `docs/features/feat-01-native-3d-network-visualization.md`. Both files will be updated to point to each other via their issue IDs (#243 for epic, #239 for feature). The changes will be pushed to the remote repository, and the corresponding GitHub issues will be updated.
 
 ## 2. File Modifications
 
-### `app_flutter/lib/features/layout/split_workspace.dart`
-- Around lines 195-201, replace the `trailingWidget` declaration with:
-```dart
-        final double? trailingWidth = isHorizontal
-            ? math.max(0.0, totalSize - clampedFirstPane - widget.dividerSize)
-            : null;
-        final double? trailingHeight = isHorizontal
-            ? null
-            : math.max(0.0, totalSize - clampedFirstPane - widget.dividerSize);
+### `docs/epics/epic-01-3d-visualization.md`
+- Create a new epic specification file with:
+  - Title: "3D Visualization Epic"
+  - YAML frontmatter containing issue_id 243.
+  - Context, Requirements & Checklist (linking child feature #239), Subsystem Component Definition, System-Level UML Class Diagram, State Machine Definitions, System State Machine Diagram, Specification Context, and Source References.
 
-        final trailingWidget = Positioned(
-          left: isHorizontal ? clampedFirstPane + widget.dividerSize : 0,
-          right: isHorizontal ? null : 0,
-          top: isHorizontal ? 0 : clampedFirstPane + widget.dividerSize,
-          bottom: isHorizontal ? 0 : null,
-          width: trailingWidth,
-          height: trailingHeight,
-          child: trailingPane,
-        );
-```
+### `docs/features/feat-01-native-3d-network-visualization.md`
+- Modify the "Parent Epic" section around line 12-14 to link to `docs/epics/epic-01-3d-visualization.md` with issue ID 243.
 
 ## 3. Success / Verification Criteria
-- Run unit tests using `flutter test` and confirm they compile and pass.
-- Commit the changes and push them to the GitHub `main` branch.
-- Verify `git diff origin/main` is completely empty.
+- Verify `docs/epics/epic-01-3d-visualization.md` adheres to the template.
+- Verify `docs/features/feat-01-native-3d-network-visualization.md` points to the new Epic file.
+- Verify both files are committed and pushed to `main` branch.
+- Verify GitHub issues #243 and #239 are edited with their respective markdown files.

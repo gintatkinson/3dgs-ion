@@ -10,7 +10,7 @@ issue_id: 239
 # Feature: Native Desktop 3D Network Visualization
 
 ## Parent Epic
-- [ ] #[EpicID] - 3D Visualization Epic (https://github.com/gintatkinson/3dgs-002/blob/main/docs/epics/epic-01-3d-visualization.md) (Aggregates high-performance native rendering pipelines)
+- [ ] #243 - 3D Visualization Epic (https://github.com/gintatkinson/3dgs-phoenix/blob/main/docs/epics/epic-01-3d-visualization.md) (Aggregates high-performance native rendering pipelines)
 
 ## Description
 Establishes a native, single-process desktop 3D network topology visualization by interfacing the C++ spatial logic library `cesium-native` (via Dart FFI) with Flutter's low-level `flutter_gpu` and high-level `flutter_scene` libraries. This setup enables rendering global-scale photorealistic tilesets and logical microwave line-of-sight (LoS) links directly in the Flutter viewport without embedded webviews or multi-process sharing mechanisms.
