@@ -1,38 +1,23 @@
-# Implementation Plan - Scenario 4 Automated Tests & Fixes
+# Implementation Plan - Feature 01 Spec Scenario 5 Update
 
 ## 1. Objectives
-Expose private testing wrappers in `GlobeTileRenderer` and add Scenario 4 BDD-style unit tests to verify visible tile grid and soft culling logic. Implement Scenario 4 fixes for soft culling, dynamic visible tile range, and polar cap clamping, verifying that all tests pass.
+Update the feature design specification file to document Scenario 5 BDD acceptance criteria (Frame-rate stability and cache thrashing prevention), and synchronize it to GitHub.
 
 ## 2. File Modifications
-### `app_flutter/lib/domain/cesium_3d/globe_tile_renderer.dart`
-- Add `import 'package:meta/meta.dart';`.
-- Add `@visibleForTesting` wrapper `visibleTilesForTesting(VirtualCamera camera, ui.Size viewportSize)` delegating to `_visibleTiles(camera, viewportSize)`.
-- Add `@visibleForTesting` wrapper `latLngToTileForTesting(double lat, double lng, int zoom)` delegating to `_latLngToTile(lat, lng, zoom)`.
-- Add `@visibleForTesting` static method `calculateIndicesForTesting(List<double> zs)` running the single subdivision tile loop.
-- **Fix 1: Soft Culling**:
-  - In `renderTiles` and `calculateIndicesForTesting`, change the triangle culling checks from `&&` to `||` so a triangle is rendered if at least one of its three vertices is visible (z >= 0.0):
-    `if (zs[i0] >= 0.0 || zs[i1] >= 0.0 || zs[i2] >= 0.0)`
-    `if (zs[i1] >= 0.0 || zs[i3] >= 0.0 || zs[i2] >= 0.0)`
-- **Fix 2: Dynamic Visible Tile Range**:
-  - In `_visibleTiles`, calculate the horizon angle theta:
-    `double theta = acos(R / (R + h))` with R = 6378137.0 and h = camera.altitude.
-  - In Tier 3 (zoom) and Tier 2 (midZoom) loops, compute the search radius dynamically:
-    `double tileWidth = 360.0 / math.pow(2, zoom);`
-    `double thetaDeg = theta * 180.0 / math.pi;`
-    `int radius = (thetaDeg / tileWidth).ceil().clamp(2, 16);`
-    Use `radius` in the loop boundaries instead of hardcoded 2.
-- **Fix 3: Polar Cap Clamping**:
-  - In `renderTiles`, when projecting coordinates, clamp latitudes >= 85.0511 to 90.0 and <= -85.0511 to -90.0. Pass the clamped `projLat` to `projectFn`.
+### `docs/features/feat-01-native-3d-network-visualization.md`
+- Append the following Scenario 5 BDD acceptance criteria to the "Given-When-Then Acceptance Criteria" section (after Scenario 4):
+  - **Scenario 5: Frame-rate stability and cache thrashing prevention**
+    - **Given** the 3D viewport is actively rendering.
+    - **When** the camera moves or stays stationary.
+    - **Then** the visible tile calculator must never generate more tiles than the image cache capacity, preventing cache thrashing, and the paint loop must execute within 16.6ms.
 
-## 3. File Creations
-### `app_flutter/test/cesium_3d/globe_tile_renderer_test.dart`
-- Set up test suite for `GlobeTileRenderer`.
-- **Test 1 (visible tile grid)**: Set up a `VirtualCamera` at altitude 500,000m. Invoke `visibleTilesForTesting`. Calculate expected horizon search offset (~16 tiles). Verify that tiles at the edge (dx >= 15) are returned. (Now passes).
-- **Test 2 (soft culling)**: Set up 25 vertex depth values where some cross the horizon (visible z >= 0, hidden z < 0). Invoke `calculateIndicesForTesting`. Verify that triangles containing at least one visible vertex are not culled and their indices are populated. (Now passes).
-- **Test 3 (polar cap clamping)**: Verify that when coordinates are rendered, latitudes at or near poles clamp to 90.0 and -90.0 and pass correctly to the projection function. (Now passes).
+## 3. GitHub Synchronization
+- Run `git add docs/features/feat-01-native-3d-network-visualization.md`
+- Commit with message: `doc: append Scenario 5 BDD acceptance criteria to Feature 01 spec`
+- Push to GitHub origin tracking branch (`git push origin main`)
+- Update GitHub Feature Issue #239 body:
+  `gh issue edit 239 --body-file docs/features/feat-01-native-3d-network-visualization.md`
 
 ## 4. Success / Verification Criteria
-- Run `flutter test test/cesium_3d/globe_tile_renderer_test.dart` (or equivalent package-based test command).
-- Verify that all tests pass.
-- Ensure the project builds successfully with no compiler/static analysis errors in the test file.
-- Push changes to the tracking branch and verify clean git status vs origin.
+- `git diff origin/main` should be empty after push.
+- `gh issue view 239` output is retrieved to confirm the issue description matches the file.
