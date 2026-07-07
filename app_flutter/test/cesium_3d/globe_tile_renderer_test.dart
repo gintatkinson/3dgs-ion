@@ -22,6 +22,49 @@ class MockTileFetcher extends TileFetcher {
   }
 }
 
+class CountingTileFetcher extends TileFetcher {
+  final Set<String> uniqueKeysRequested = {};
+  final Map<String, int> networkFetchCounts = {};
+  int totalNetworkFetches = 0;
+  final Map<String, Uint8List> cache = {};
+  final int cacheCapacity;
+
+  CountingTileFetcher({this.cacheCapacity = 64});
+
+  @override
+  bool isEnabled() => true;
+
+  void resetCounts() {
+    networkFetchCounts.clear();
+    totalNetworkFetches = 0;
+    uniqueKeysRequested.clear();
+  }
+
+  @override
+  Future<Uint8List?> fetchTile(
+      ImageryProvider provider, int z, int x, int y) async {
+    final key = '$z/$x/$y';
+    uniqueKeysRequested.add(key);
+
+    if (cache.containsKey(key)) {
+      return cache[key];
+    }
+
+    networkFetchCounts[key] = (networkFetchCounts[key] ?? 0) + 1;
+    totalNetworkFetches++;
+
+    final data = base64Decode(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==");
+
+    if (cache.length >= cacheCapacity) {
+      cache.remove(cache.keys.first);
+    }
+    cache[key] = data;
+
+    return data;
+  }
+}
+
 void main() {
   group('GlobeTileRenderer Scenario 4 BDD Tests', () {
     test('Scenario 4 - visible tile grid: horizon search radius verification at high altitude', () {
@@ -78,7 +121,7 @@ void main() {
         fetcher: fetcher,
         onTileLoaded: () {
           loadedCount++;
-          if (loadedCount >= 16) {
+          if (loadedCount >= 16 && !completer.isCompleted) {
             completer.complete();
           }
         },
@@ -127,6 +170,70 @@ void main() {
       expect(latitudes, contains(-90.0));
       expect(latitudes, isNot(contains(unclampedNorth)));
       expect(latitudes, isNot(contains(unclampedSouth)));
+    });
+
+    test('Test 4 (Scenario 5 - Cache budget safety)', () {
+      final fetcher = TileFetcher()..disable();
+      final renderer = GlobeTileRenderer(fetcher: fetcher);
+      final size = const ui.Size(800, 600);
+
+      // Test at 500,000m altitude
+      final cameraLow = VirtualCamera(
+        latitude: 0.0,
+        longitude: 0.0,
+        altitude: 500000.0,
+        heading: 0.0,
+        pitch: 0.0,
+        roll: 0.0,
+      );
+      final tilesLow = renderer.visibleTilesForTesting(cameraLow, size);
+      expect(tilesLow.length, lessThanOrEqualTo(64),
+          reason: 'At 500,000m altitude, tile count should not exceed 64 to fit cache budget');
+
+      // Test at 10,000,000m altitude
+      final cameraHigh = VirtualCamera(
+        latitude: 0.0,
+        longitude: 0.0,
+        altitude: 10000000.0,
+        heading: 0.0,
+        pitch: 0.0,
+        roll: 0.0,
+      );
+      final tilesHigh = renderer.visibleTilesForTesting(cameraHigh, size);
+      expect(tilesHigh.length, lessThanOrEqualTo(64),
+          reason: 'At 10,000,000m altitude, tile count should not exceed 64 to fit cache budget');
+    });
+
+    test('Test 5 (Scenario 5 - Caching stability & thrashing prevention)', () async {
+      final fetcher = CountingTileFetcher(cacheCapacity: 64);
+      final renderer = GlobeTileRenderer(fetcher: fetcher);
+      final size = const ui.Size(800, 600);
+      final camera = VirtualCamera(
+        latitude: 0.0,
+        longitude: 0.0,
+        altitude: 500000.0,
+        heading: 0.0,
+        pitch: 0.0,
+        roll: 0.0,
+      );
+
+      // Call beginTileFetch repeatedly to let fetches process
+      for (int i = 0; i < 30; i++) {
+        renderer.beginTileFetch(camera, size);
+        await Future.delayed(const Duration(milliseconds: 10));
+      }
+
+      // The total number of network fetches must not exceed the number of unique tiles requested.
+      expect(fetcher.totalNetworkFetches, equals(fetcher.uniqueKeysRequested.length),
+          reason: 'Should not have duplicate network fetches for the same tiles (no thrashing)');
+
+      // Reset counters and verify that subsequent calls result in 0 new network fetches
+      fetcher.resetCounts();
+      renderer.beginTileFetch(camera, size);
+      await Future.delayed(const Duration(milliseconds: 20));
+
+      expect(fetcher.totalNetworkFetches, equals(0),
+          reason: 'Subsequent calls for a stationary camera must result in 0 new network fetches');
     });
   });
 }

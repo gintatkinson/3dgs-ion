@@ -1,23 +1,22 @@
-# Implementation Plan - Feature 01 Spec Scenario 5 Update
+# Implementation Plan - Scenario 5 BDD Tests Implementation
 
 ## 1. Objectives
-Update the feature design specification file to document Scenario 5 BDD acceptance criteria (Frame-rate stability and cache thrashing prevention), and synchronize it to GitHub.
+Implement two new BDD tests for Scenario 5 (Cache budget safety and Caching stability/thrashing prevention) in the existing test file `app_flutter/test/cesium_3d/globe_tile_renderer_test.dart`. Verify that both new tests fail on the current codebase, demonstrating a clean RED state.
 
 ## 2. File Modifications
-### `docs/features/feat-01-native-3d-network-visualization.md`
-- Append the following Scenario 5 BDD acceptance criteria to the "Given-When-Then Acceptance Criteria" section (after Scenario 4):
-  - **Scenario 5: Frame-rate stability and cache thrashing prevention**
-    - **Given** the 3D viewport is actively rendering.
-    - **When** the camera moves or stays stationary.
-    - **Then** the visible tile calculator must never generate more tiles than the image cache capacity, preventing cache thrashing, and the paint loop must execute within 16.6ms.
+### `app_flutter/test/cesium_3d/globe_tile_renderer_test.dart`
+- Create a `CountingTileFetcher` mock class extending `TileFetcher` that tracks the invocation count for each unique tile coordinate (z, x, y) and the total number of fetch operations.
+- Fix a pre-existing async completer bug in the Polar cap clamping test by checking `!completer.isCompleted` before calling `completer.complete()`.
+- Add `Test 4 (Scenario 5 - Cache budget safety)`:
+  - Given: A VirtualCamera positioned at various altitudes (500,000m and 10,000,000m).
+  - When: Calling `visibleTilesForTesting(camera, size)`.
+  - Then: The total count of returned tiles must never exceed 64 (representing a safe computational budget within our maximum cache size of 128).
+- Add `Test 5 (Scenario 5 - Caching stability & thrashing prevention)`:
+  - Given: A GlobeTileRenderer with a mock/custom TileFetcher that tracks the number of times `fetchTile` is invoked.
+  - When: Calling `beginTileFetch` repeatedly (e.g., 10 times) for a stationary camera.
+  - Then: The total number of unique `fetchTile` calls must not exceed the number of unique visible tiles, and subsequent calls must hit the cache and result in 0 new network fetches.
 
-## 3. GitHub Synchronization
-- Run `git add docs/features/feat-01-native-3d-network-visualization.md`
-- Commit with message: `doc: append Scenario 5 BDD acceptance criteria to Feature 01 spec`
-- Push to GitHub origin tracking branch (`git push origin main`)
-- Update GitHub Feature Issue #239 body:
-  `gh issue edit 239 --body-file docs/features/feat-01-native-3d-network-visualization.md`
-
-## 4. Success / Verification Criteria
-- `git diff origin/main` should be empty after push.
-- `gh issue view 239` output is retrieved to confirm the issue description matches the file.
+## 3. Success / Verification Criteria
+- Run `flutter test test/cesium_3d/globe_tile_renderer_test.dart`.
+- Verify the test run compiles successfully.
+- Verify that both new tests fail in a clean RED state, while the existing Scenario 4 tests (including Polar cap clamping) now pass.
