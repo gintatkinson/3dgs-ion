@@ -150,6 +150,11 @@ class GlobeTileRenderer {
     final center = _latLngToTile(camera.latitude, camera.longitude, zoom);
     final List<TileCoord> tiles = [];
 
+    // Horizon angle theta = acos(R / (R + h)) where R = 6378137.0
+    final double R = 6378137.0;
+    final double h = camera.altitude;
+    final double theta = math.acos(R / (R + h));
+
     // Tier 1: Zoom 2 (global background coverage)
     for (int x = 0; x < 4; x++) {
       for (int y = 0; y < 4; y++) {
@@ -162,8 +167,11 @@ class GlobeTileRenderer {
     if (midZoom > 2) {
       final midCenter = _latLngToTile(camera.latitude, camera.longitude, midZoom);
       final midN = math.pow(2, midZoom).toInt();
-      for (int dx = -2; dx <= 3; dx++) {
-        for (int dy = -2; dy <= 3; dy++) {
+      final double tileWidth = 360.0 / math.pow(2, midZoom);
+      final double thetaDeg = theta * 180.0 / math.pi;
+      final int radius = (thetaDeg / tileWidth).ceil().clamp(2, 16);
+      for (int dx = -radius; dx <= radius; dx++) {
+        for (int dy = -radius; dy <= radius; dy++) {
           final tx = (midCenter.x + dx).clamp(0, midN - 1);
           final ty = (midCenter.y + dy).clamp(0, midN - 1);
           tiles.add(TileCoord(zoom: midZoom, x: tx, y: ty));
@@ -174,8 +182,11 @@ class GlobeTileRenderer {
     // Tier 3: Zoom Z (High-resolution close-up)
     if (zoom > 2) {
       final n = math.pow(2, zoom).toInt();
-      for (int dx = -2; dx <= 2; dx++) {
-        for (int dy = -2; dy <= 2; dy++) {
+      final double tileWidth = 360.0 / math.pow(2, zoom);
+      final double thetaDeg = theta * 180.0 / math.pi;
+      final int radius = (thetaDeg / tileWidth).ceil().clamp(2, 16);
+      for (int dx = -radius; dx <= radius; dx++) {
+        for (int dy = -radius; dy <= radius; dy++) {
           final tx = (center.x + dx).clamp(0, n - 1);
           final ty = (center.y + dy).clamp(0, n - 1);
           tiles.add(TileCoord(zoom: zoom, x: tx, y: ty));
@@ -326,7 +337,14 @@ class GlobeTileRenderer {
           final double lon = _rad(lonDeg);
           final double texX = u * 256.0;
 
-          final projected = projectFn(latDeg, lonDeg);
+          double projLat = latDeg;
+          if (latDeg >= 85.0511) {
+            projLat = 90.0;
+          } else if (latDeg <= -85.0511) {
+            projLat = -90.0;
+          }
+
+          final projected = projectFn(projLat, lonDeg);
           positions.add(projected.offset);
           textureCoordinates.add(ui.Offset(texX, texY));
           zs.add(projected.z);
@@ -342,14 +360,14 @@ class GlobeTileRenderer {
           final int i3 = i2 + 1;
 
           // Triangle 1: (i0, i1, i2)
-          if (zs[i0] >= 0.0 && zs[i1] >= 0.0 && zs[i2] >= 0.0) {
+          if (zs[i0] >= 0.0 || zs[i1] >= 0.0 || zs[i2] >= 0.0) {
             indices.add(i0);
             indices.add(i1);
             indices.add(i2);
           }
 
           // Triangle 2: (i1, i3, i2)
-          if (zs[i1] >= 0.0 && zs[i3] >= 0.0 && zs[i2] >= 0.0) {
+          if (zs[i1] >= 0.0 || zs[i3] >= 0.0 || zs[i2] >= 0.0) {
             indices.add(i1);
             indices.add(i3);
             indices.add(i2);
@@ -421,14 +439,14 @@ class GlobeTileRenderer {
         final int i3 = i2 + 1;
 
         // Triangle 1: (i0, i1, i2)
-        if (zs[i0] >= 0.0 && zs[i1] >= 0.0 && zs[i2] >= 0.0) {
+        if (zs[i0] >= 0.0 || zs[i1] >= 0.0 || zs[i2] >= 0.0) {
           indices.add(i0);
           indices.add(i1);
           indices.add(i2);
         }
 
         // Triangle 2: (i1, i3, i2)
-        if (zs[i1] >= 0.0 && zs[i3] >= 0.0 && zs[i2] >= 0.0) {
+        if (zs[i1] >= 0.0 || zs[i3] >= 0.0 || zs[i2] >= 0.0) {
           indices.add(i1);
           indices.add(i3);
           indices.add(i2);
