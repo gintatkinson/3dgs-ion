@@ -41,7 +41,7 @@ class GlobeTileRenderer {
   ImageryProvider _activeProvider;
   final ui.VoidCallback? onTileLoaded;
 
-  /// Decoded tile images keyed by "[zoom]/[x]/[y]". Limited to 64 entries.
+  /// Decoded tile images keyed by "[zoom]/[x]/[y]". Limited to 128 entries.
   final Map<String, ui.Image> _loadedImages = {};
 
   /// Set of tile keys for which an HTTP fetch is currently in-flight.
@@ -167,11 +167,11 @@ class GlobeTileRenderer {
     if (midZoom > 2) {
       final midCenter = _latLngToTile(camera.latitude, camera.longitude, midZoom);
       final midN = math.pow(2, midZoom).toInt();
-      final double tileWidth = 360.0 / math.pow(2, midZoom);
+      final double midTileWidth = 360.0 / math.pow(2, midZoom);
       final double thetaDeg = theta * 180.0 / math.pi;
-      final int radius = (thetaDeg / tileWidth).ceil().clamp(2, 16);
-      for (int dx = -radius; dx <= radius; dx++) {
-        for (int dy = -radius; dy <= radius; dy++) {
+      final int midRadius = (thetaDeg / midTileWidth).ceil().clamp(1, 2);
+      for (int dx = -midRadius; dx <= midRadius; dx++) {
+        for (int dy = -midRadius; dy <= midRadius; dy++) {
           final tx = (midCenter.x + dx).clamp(0, midN - 1);
           final ty = (midCenter.y + dy).clamp(0, midN - 1);
           tiles.add(TileCoord(zoom: midZoom, x: tx, y: ty));
@@ -184,7 +184,7 @@ class GlobeTileRenderer {
       final n = math.pow(2, zoom).toInt();
       final double tileWidth = 360.0 / math.pow(2, zoom);
       final double thetaDeg = theta * 180.0 / math.pi;
-      final int radius = (thetaDeg / tileWidth).ceil().clamp(2, 16);
+      final int radius = (thetaDeg / tileWidth).ceil().clamp(1, 2);
       for (int dx = -radius; dx <= radius; dx++) {
         for (int dy = -radius; dy <= radius; dy++) {
           final tx = (center.x + dx).clamp(0, n - 1);
@@ -262,7 +262,7 @@ class GlobeTileRenderer {
           existing.dispose();
         }
         _loadedImages[tile.key] = image;
-        if (_loadedImages.length > 64) {
+        if (_loadedImages.length > 128) {
           final firstKey = _loadedImages.keys.first;
           final evicted = _loadedImages.remove(firstKey);
           evicted?.dispose();
