@@ -285,8 +285,8 @@ void main() {
 
       final double actualDistance = (projectedPoint.offset - center).distance;
 
-      // Assert z is equal to -0.01 (culled status)
-      expect(projectedPoint.z, equals(-0.01));
+      // Assert z is equal to -1.0 (culled status)
+      expect(projectedPoint.z, equals(-1.0));
 
       // Assert distance from projectedCenter is close to projectedRadius (within 1e-4 tolerance)
       expect(actualDistance, closeTo(projectedRadius, 1e-4));

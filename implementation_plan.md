@@ -33,15 +33,16 @@ Additionally, add Scenario 6 - Horizon projection clamping test to verify that p
   - Then: The projected point is marked as culled (z < 0), and its 2D screen coordinate Offset must be clamped exactly to the projected horizon silhouette boundary.
     - Expected distance from projectedCenter: exactly equal to `projectedRadius = R * F / sqrt(cRad * cRad - R * R)` where F = 600 * 1.2 = 720, cRad = R + 500,000.
     - Assert that `(projectedPoint.offset - projectedCenter).distance` is close to `projectedRadius` (within 1e-4 tolerance).
-    - Assert that `projectedPoint.z` is equal to `-0.01`.
+    - Assert that `projectedPoint.z` is equal to `-1.0`.
 
 ### `app_flutter/lib/features/topology/scene_3d_viewport.dart`
 - Locate the end of the `project` method and replace the viewport projection return with clamping logic for culled vertices.
-- For culled vertices, set `depthVal = -0.01` and clamp the screen offset to the projected horizon boundary.
+- For culled vertices, set `depthVal = -1.0` and clamp the screen offset to the projected horizon boundary.
 
 ## 3. Success / Verification Criteria
 - Run `flutter test test/cesium_3d/globe_tile_renderer_test.dart` in `app_flutter`.
-- Verify that all 6 tests (including Test 6) pass successfully (GREEN state).
+- Run `flutter test test/topology/scene_3d_viewport_test.dart` in `app_flutter`.
+- Verify that all tests pass successfully (GREEN state).
 - Commit and push the modifications to GitHub.
 - Verify `git diff` shows no unpushed/uncommitted changes on the remote tracking branch.
 

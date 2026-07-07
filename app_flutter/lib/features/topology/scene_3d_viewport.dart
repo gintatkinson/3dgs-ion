@@ -1198,7 +1198,7 @@ class Scene3DViewportPainter extends CustomPainter {
     Offset projectedOffset = Offset(center.dx + rx_pixel, center.dy - ry_pixel);
 
     if (isCulled) {
-      depthVal = -0.01;
+      depthVal = -1.0;
       final double radDiff = cRad * cRad - R * R;
       final double projectedRadius = R * F / math.sqrt(radDiff <= 0.0 ? 1.0 : radDiff);
       
