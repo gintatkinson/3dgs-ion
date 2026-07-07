@@ -1187,8 +1187,6 @@ class Scene3DViewportPainter extends CustomPainter {
         isCulled = true;
       }
     }
-    final double depthVal = isCulled ? -1.0 : depth;
-
     // Focal length (45-degree FOV)
     final double F = size.shortestSide * 1.2;
     final double pScale = depth <= 0.0 ? 1.0 : F / depth;
@@ -1196,7 +1194,24 @@ class Scene3DViewportPainter extends CustomPainter {
     final double rx_pixel = x_cam * pScale;
     final double ry_pixel = y_cam * pScale;
 
-    return ProjectedPoint(Offset(center.dx + rx_pixel, center.dy - ry_pixel), depthVal);
+    double depthVal = depth;
+    Offset projectedOffset = Offset(center.dx + rx_pixel, center.dy - ry_pixel);
+
+    if (isCulled) {
+      depthVal = -0.01;
+      final double radDiff = cRad * cRad - R * R;
+      final double projectedRadius = R * F / math.sqrt(radDiff <= 0.0 ? 1.0 : radDiff);
+      
+      final double dx = projectedOffset.dx - center.dx;
+      final double dy = projectedOffset.dy - center.dy;
+      final double dist = math.sqrt(dx * dx + dy * dy);
+      if (dist > 0.0) {
+        final double scale = projectedRadius / dist;
+        projectedOffset = Offset(center.dx + dx * scale, center.dy + dy * scale);
+      }
+    }
+
+    return ProjectedPoint(projectedOffset, depthVal);
   }
 
   // Convert degrees to radians
