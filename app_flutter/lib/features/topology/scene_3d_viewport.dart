@@ -1068,6 +1068,22 @@ class Scene3DViewportPainter extends CustomPainter {
   late final Paint _packetPaint = Paint()
     ..color = const Color(0xFFFFD54F);
 
+  late final Paint _gsPointPaint = Paint()
+    ..color = const Color(0xFF00E5FF)
+    ..strokeWidth = 6.0
+    ..strokeCap = StrokeCap.round
+    ..style = PaintingStyle.stroke;
+  late final Paint _gsGlowPointPaint = Paint()
+    ..color = const Color(0x6600E5FF)
+    ..strokeWidth = 12.0
+    ..strokeCap = StrokeCap.round
+    ..style = PaintingStyle.stroke;
+  late final Paint _packetPointPaint = Paint()
+    ..color = const Color(0xFFFFD54F)
+    ..strokeWidth = 5.0
+    ..strokeCap = StrokeCap.round
+    ..style = PaintingStyle.stroke;
+
   late final Paint _bandFillPaint = Paint()..style = PaintingStyle.fill;
   late final Paint _bandBorderPaint = Paint()
     ..style = PaintingStyle.stroke
@@ -1668,6 +1684,8 @@ class Scene3DViewportPainter extends CustomPainter {
     }
 
     final Map<String, ProjectedPoint> allProjectedNodes = {};
+    final List<Offset> groundGlowPoints = [];
+    final List<Offset> groundPoints = [];
 
     for (final node in nodes) {
       final String id = node.id;
@@ -1760,8 +1778,8 @@ class Scene3DViewportPainter extends CustomPainter {
             canvas.drawCircle(proj.offset, 4.0, _satNodePaint);
             canvas.drawCircle(proj.offset, 1.8, _innerWhitePaint);
           } else if (type == 'ground') {
-            canvas.drawCircle(proj.offset, 6.0, _gsGlowPaint);
-            canvas.drawCircle(proj.offset, 3.0, _gsPaint);
+            groundGlowPoints.add(proj.offset);
+            groundPoints.add(proj.offset);
           } else if (type == 'underwater') {
             canvas.drawCircle(proj.offset, 3.0, _gsPaint);
             canvas.drawCircle(proj.offset, 7.5, _uwRingPaint);
@@ -1799,8 +1817,21 @@ class Scene3DViewportPainter extends CustomPainter {
       }
     }
 
+    if (showDevices) {
+      if (groundGlowPoints.isNotEmpty) {
+        canvas.drawPoints(PointMode.points, groundGlowPoints, _gsGlowPointPaint);
+      }
+      if (groundPoints.isNotEmpty) {
+        canvas.drawPoints(PointMode.points, groundPoints, _gsPointPaint);
+      }
+    }
+
     // 8. Draw Network Links & Active Packets (Dynamic DB-Backed)
     if (showLinks && showDevices) {
+      final List<Offset> linkGlowPoints = [];
+      final List<Offset> linkPoints = [];
+      final List<Offset> packetPoints = [];
+
       for (int i = 0; i < links.length; i++) {
         final link = links[i];
         final String n1 = link.source;
@@ -1810,13 +1841,26 @@ class Scene3DViewportPainter extends CustomPainter {
         final ProjectedPoint? p2 = allProjectedNodes[n2];
         
         if (p1 != null && p2 != null) {
-          canvas.drawLine(p1.offset, p2.offset, _linkGlowPaint);
-          canvas.drawLine(p1.offset, p2.offset, _linkPaint);
+          linkGlowPoints.add(p1.offset);
+          linkGlowPoints.add(p2.offset);
+          
+          linkPoints.add(p1.offset);
+          linkPoints.add(p2.offset);
 
           final double packetT = (i * 0.25) % 1.0;
           final Offset packetOffset = Offset.lerp(p1.offset, p2.offset, packetT)!;
-          canvas.drawCircle(packetOffset, 2.5, _packetPaint);
+          packetPoints.add(packetOffset);
         }
+      }
+
+      if (linkGlowPoints.isNotEmpty) {
+        canvas.drawPoints(PointMode.lines, linkGlowPoints, _linkGlowPaint);
+      }
+      if (linkPoints.isNotEmpty) {
+        canvas.drawPoints(PointMode.lines, linkPoints, _linkPaint);
+      }
+      if (packetPoints.isNotEmpty) {
+        canvas.drawPoints(PointMode.points, packetPoints, _packetPointPaint);
       }
     }
 
