@@ -1,63 +1,35 @@
-# Implementation Plan - Dual-Stage Culling/Clipping Fix & Regression Test
+# Implementation Plan - Camera-Terrain Collision & Clamping
 
 ## 1. Objectives
-- Add a new regression test `Test 5 (Scenario 6 - Discard triangles crossing behind camera)` to `app_flutter/test/cesium_3d/globe_tile_renderer_test.dart` to verify that triangles with any behind-camera vertex (depth <= -1.5) are correctly discarded/culled.
-- Implement the camera plane depth-clamping update in `app_flutter/lib/features/topology/scene_3d_viewport.dart`.
-- Implement triangle discarding logic for vertices crossing behind the camera plane in `app_flutter/lib/domain/cesium_3d/globe_tile_renderer.dart`.
+- Implement camera-terrain collision detection and clamping algorithms to prevent the camera from going below the terrain.
+- Create a test file `app_flutter/test/cesium_3d/camera_collision_test.dart` to verify clamping behavior over ocean (flat terrain), Mount Fuji (amplified terrain), and when panning towards rising terrain.
+- Update `CameraController` to support terrain height clamping for `updateCamera`, `zoom`, `zoomInteractive`, and `pan`.
+- Share the elevation calculation in `Scene3DViewport` as a static method and set up `elevationProvider` inside `Scene3DViewportPainter`'s camera controller initialization.
+- Adjust distance computations in `Scene3DViewportPainter` to include dynamic terrain elevation.
 
 ## 2. File Modifications
 
-### `app_flutter/test/cesium_3d/globe_tile_renderer_test.dart`
-- Define `FakeCanvas` class mapping `ui.Canvas`:
-  ```dart
-  class FakeCanvas extends Fake implements ui.Canvas {
-    int drawVerticesCount = 0;
-    @override
-    void drawVertices(ui.Vertices vertices, ui.BlendMode blendMode, ui.Paint paint) {
-      drawVerticesCount++;
-    }
-  }
-  ```
-- Inside the main `GlobeTileRenderer Scenario 4 BDD Tests` group, add `Test 5 (Scenario 6 - Discard triangles crossing behind camera)` test case at the end of the group.
+### `app_flutter/test/cesium_3d/camera_collision_test.dart` (Create)
+- Create a new unit test suite as specified in the instructions, testing the following cases:
+  - Nadir Zoom-in Clamps at Ellipsoid Base Over Ocean (Flat Terrain).
+  - Nadir Zoom-in Clamps Correctly Above Amplified Mount Fuji.
+  - Panning Toward Rising Terrain Automatically Lifts Camera.
 
-### `app_flutter/lib/features/topology/scene_3d_viewport.dart`
-- Around line 1230, modify the depthVal computation:
-  ```dart
-  final double depthVal;
-  if (depth <= 0.0) {
-    depthVal = -100.0;
-  } else if (isCulled) {
-    depthVal = -1.0;
-  } else {
-    depthVal = depth;
-  }
-  ```
+### `app_flutter/lib/domain/cesium_3d/camera_controller.dart` (Modify)
+- Add `double Function(double lat, double lng)? elevationProvider` field.
+- Add helper methods `_getTerrainHeight` and `_clampAltitudeToTerrain`.
+- Update `updateCamera` to clamp target altitude.
+- Update `zoom` to clamp target altitude AGL.
+- Update `zoomInteractive` to clamp target altitude AGL.
+- Update `pan` to clamp target altitude.
 
-### `app_flutter/lib/domain/cesium_3d/globe_tile_renderer.dart`
-- Around lines 363-374, modify indices calculation to discard any triangle crossing behind the camera plane (`depthVal < -1.5`):
-  ```dart
-  // Triangle 1: (i0, i1, i2)
-  if (zs[i0] < -1.5 || zs[i1] < -1.5 || zs[i2] < -1.5) {
-    // Discard
-  } else if (zs[i0] >= 0.0 || zs[i1] >= 0.0 || zs[i2] >= 0.0) {
-    indices.add(i0);
-    indices.add(i1);
-    indices.add(i2);
-  }
-
-  // Triangle 2: (i1, i3, i2)
-  if (zs[i1] < -1.5 || zs[i3] < -1.5 || zs[i2] < -1.5) {
-    // Discard
-  } else if (zs[i1] >= 0.0 || zs[i3] >= 0.0 || zs[i2] >= 0.0) {
-    indices.add(i1);
-    indices.add(i3);
-    indices.add(i2);
-  }
-  ```
+### `app_flutter/lib/features/topology/scene_3d_viewport.dart` (Modify)
+- Make elevation calculation static as `getElevationStatic`.
+- Update standard `getElevation` to call `getElevationStatic`.
+- In `initState()` of `_Scene3DViewportState`, assign `elevationProvider` to the camera controller.
+- Update `cRad` definitions in `_clickToCamera`, `project`, `_getHorizonPath`, and `paint` within `scene_3d_viewport.dart` to compensate for dynamic terrain elevation.
 
 ## 3. Success / Verification Criteria
-- First, verify that the new test fails without the fixes.
-- Apply the fixes and verify that the tests pass:
-  `flutter test test/cesium_3d/globe_tile_renderer_test.dart test/topology/scene_3d_viewport_test.dart`
-- Ensure `git diff origin/main` (or the tracking remote branch) is clean after changes are successfully pushed.
-
+- Run unit/widget tests to confirm:
+  `flutter test test/cesium_3d/camera_collision_test.dart test/topology/scene_3d_viewport_test.dart test/cesium_3d/globe_tile_renderer_test.dart`
+- Verify that `git diff origin/main` is clean after changes are successfully pushed.

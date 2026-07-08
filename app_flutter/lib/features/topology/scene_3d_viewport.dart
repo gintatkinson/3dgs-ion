@@ -136,6 +136,9 @@ class Scene3DViewportState extends State<Scene3DViewport> {
   void initState() {
     super.initState();
     _cameraController = CameraController(widget.camera);
+    _cameraController.elevationProvider = (lat, lng) {
+      return Scene3DViewportPainter.getElevationStatic(lat, lng, _elevationActive) * 80.0;
+    };
     _cameraController.addListener(_onCameraChangedInside);
 
     final fetcher = TileFetcher();
@@ -380,7 +383,8 @@ class Scene3DViewportState extends State<Scene3DViewport> {
     final ProjectedPoint earthCenterProj = painter.project(0.0, 0.0, 0.0, center, 0.0, 0.0, size);
     final Offset projectedCenter = earthCenterProj.offset;
 
-    final double cRad = 6378137.0 + camera.altitude;
+    final double camElevation = _elevationActive ? Scene3DViewportPainter.getElevationStatic(camera.latitude, camera.longitude, true) * 80.0 : 0.0;
+    final double cRad = 6378137.0 + camera.altitude + camElevation;
     final double F = size.shortestSide * 1.2;
     final double radDiff1 = cRad * cRad - 6378137.0 * 6378137.0;
     final double projectedRadius = 6378137.0 * F / math.sqrt(radDiff1 <= 0.0 ? 1.0 : radDiff1);
@@ -1144,7 +1148,8 @@ class Scene3DViewportPainter extends CustomPainter {
     }
 
     // Camera position in ECEF
-    final double cRad = R + camera.altitude;
+    final double camElevation = elevationActive ? getElevation(camera.latitude, camera.longitude) * 80.0 : 0.0;
+    final double cRad = R + camera.altitude + camElevation;
     final double cx = cRad * math.cos(radLat) * math.cos(radLng);
     final double cy = cRad * math.cos(radLat) * math.sin(radLng);
     final double cz = cRad * math.sin(radLat);
@@ -1240,33 +1245,32 @@ class Scene3DViewportPainter extends CustomPainter {
     return ProjectedPoint(projectedOffset, depthVal);
   }
 
-  double getElevation(double latDeg, double lngDeg) {
+  static double getElevationStatic(double latDeg, double lngDeg, bool elevationActive) {
     if (!elevationActive) return 0.0;
-
-    // Mount Fuji peak: 35.3606° N, 138.7274° E
     final double dLat = latDeg - 35.3606;
     final double dLng = lngDeg - 138.7274;
     final double distSq = dLat * dLat + dLng * dLng;
-
     double elev = 0.0;
     final double fujiDist = math.sqrt(distSq);
     if (fujiDist < 0.25) {
       elev += 3776.0 * math.exp(-fujiDist * fujiDist / (0.04 * 0.04));
     }
-
-    // Alps mountain range around central Japan: 34.5° N - 37.5° N, 136.0° E - 140.0° E
     if (latDeg > 34.5 && latDeg < 37.5 && lngDeg > 136.0 && lngDeg < 140.0) {
       final double rangeNoise = math.sin(latDeg * 12.0) * math.cos(lngDeg * 12.0) * 1200.0 +
                                math.sin(latDeg * 25.0) * math.sin(lngDeg * 25.0) * 400.0;
       elev += math.max(0.0, rangeNoise);
     }
-
     return elev;
+  }
+
+  double getElevation(double latDeg, double lngDeg) {
+    return getElevationStatic(latDeg, lngDeg, elevationActive);
   }
 
   Path _getHorizonPath(Size size, Offset center, double rotationAngle, double tilt) {
     final double R = 6378137.0;
-    final double cRad = R + camera.altitude;
+    final double camElevation = elevationActive ? getElevation(camera.latitude, camera.longitude) * 80.0 : 0.0;
+    final double cRad = R + camera.altitude + camElevation;
     final double d2 = cRad * cRad;
 
     final double radLng = -rotationAngle;
@@ -1368,7 +1372,8 @@ class Scene3DViewportPainter extends CustomPainter {
     final ProjectedPoint earthCenterProj = project(0.0, 0.0, 0.0, center, 0.0, 0.0, size);
     final Offset projectedCenter = earthCenterProj.offset;
 
-    final double cRad = 6378137.0 + camera.altitude;
+    final double camElevation = elevationActive ? getElevation(camera.latitude, camera.longitude) * 80.0 : 0.0;
+    final double cRad = 6378137.0 + camera.altitude + camElevation;
     final double F = size.shortestSide * 1.2;
     final double radDiff = cRad * cRad - 6378137.0 * 6378137.0;
     final double projectedRadius = 6378137.0 * F / math.sqrt(radDiff <= 0.0 ? 1.0 : radDiff);
