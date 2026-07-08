@@ -119,7 +119,6 @@ void main() {
             if (startIdx < 0) return; // safety guard
             final List<double> tileZs = allProjectedZs.sublist(startIdx);
 
-            final List<int> filteredIndices = [];
             for (int j = 0; j < indices.length; j += 3) {
               final idx0 = indices[j];
               final idx1 = indices[j + 1];
@@ -129,34 +128,20 @@ void main() {
               final z1 = tileZs[idx1];
               final z2 = tileZs[idx2];
 
-              final p0 = positions[idx0];
-              final p1 = positions[idx1];
-              final p2 = positions[idx2];
-
-              bool isWithinViewport(ui.Offset p) {
-                return p.dx >= 0.0 && p.dx <= 800.0 && p.dy >= 0.0 && p.dy <= 600.0;
-              }
-
-              // Culled / clamped horizon vertices have z == -1.0. Discard those triangles.
-              final bool isNormal = z0 != -1.0 && z1 != -1.0 && z2 != -1.0;
-              final bool isOnScreen = isWithinViewport(p0) || isWithinViewport(p1) || isWithinViewport(p2);
-
-              if (isNormal && isOnScreen) {
-                filteredIndices.add(idx0);
-                filteredIndices.add(idx1);
-                filteredIndices.add(idx2);
+              // 1. Strict Behind-Camera Check
+              if (z0 < -1.5 || z1 < -1.5 || z2 < -1.5) {
+                throw Exception('Behind-Camera Render Violation: Triangle ($idx0, $idx1, $idx2) contains vertices behind camera plane (z0=$z0, z1=$z1, z2=$z2).');
               }
             }
 
-            if (filteredIndices.isNotEmpty) {
-              MeshGeometryValidator.validate(
-                positions: positions,
-                indices: filteredIndices,
-                minQualityThreshold: 0.0, // Oblique perspective views naturally compress normal triangles into slivers
-                checkWinding: false,      // Mixed winding orientations are expected near the limb
-                maxSpikeEdgeRatio: 200.0,  // Allow higher ratio to accommodate steep procedural elevation cliffs
-              );
-            }
+            // 2. Strict Mesh Geometry checks
+            MeshGeometryValidator.validate(
+              positions: positions,
+              indices: indices,
+              checkWinding: true, // Enable strict winding consistency check
+              minQualityThreshold: 0.001, // Strict sliver triangle threshold
+              maxSpikeEdgeRatio: 60.0, // Strict edge spike threshold
+            );
           };
 
           renderer.renderTiles(
