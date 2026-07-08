@@ -41,6 +41,9 @@ class GlobeTileRenderer {
   ImageryProvider _activeProvider;
   final ui.VoidCallback? onTileLoaded;
 
+  @visibleForTesting
+  void Function(List<ui.Offset> positions, List<int> indices)? onDrawVerticesForTesting;
+
   /// Decoded tile images keyed by "[zoom]/[x]/[y]". Limited to 128 entries.
   final Map<String, ui.Image> _loadedImages = {};
 
@@ -380,6 +383,10 @@ class GlobeTileRenderer {
       }
 
       if (indices.isEmpty) continue;
+
+      if (onDrawVerticesForTesting != null) {
+        onDrawVerticesForTesting!(positions, indices);
+      }
 
       final vertices = ui.Vertices(
         ui.VertexMode.triangles,

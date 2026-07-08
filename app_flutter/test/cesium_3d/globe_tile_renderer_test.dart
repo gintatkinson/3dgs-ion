@@ -354,13 +354,21 @@ void main() {
     });
 
     test('Test 6 (Scenario 7 - Mesh geometry distortion validation sweep)', () async {
-      final fetcher = TileFetcher()..disable();
-      final renderer = GlobeTileRenderer(fetcher: fetcher);
+      final fetcher = MockTileFetcher();
+      int loadedCount = 0;
+      final renderer = GlobeTileRenderer(
+        fetcher: fetcher,
+        onTileLoaded: () {
+          loadedCount++;
+        },
+      );
 
       final latitudes = [-35.0, 0.0, 35.3606];
       final longitudes = [-135.0, 0.0, 138.7274];
       final altitudes = [25000.0, 500000.0, 2000000.0];
       final pitches = [-90.0, -45.0, -15.0];
+
+      int callbackCount = 0;
 
       for (final lat in latitudes) {
         for (final lng in longitudes) {
@@ -391,61 +399,86 @@ void main() {
 
               const ui.Size size = ui.Size(800, 600);
               const ui.Offset center = ui.Offset(400.0, 300.0);
-              final List<ui.Offset> positions = [];
-              final List<double> zs = [];
 
-              // 9x9 grid
-              for (int r = 0; r <= 8; r++) {
-                final double latOffset = (r - 4) * 0.1;
-                for (int c = 0; c <= 8; c++) {
-                  final double lngOffset = (c - 4) * 0.1;
-                  final double vLat = (camera.latitude + latOffset) * math.pi / 180.0;
-                  final double vLng = (camera.longitude + lngOffset) * math.pi / 180.0;
-                  final double height = 6378137.0 + painter.getElevation(camera.latitude + latOffset, camera.longitude + lngOffset) * 80.0;
-
-                  final proj = painter.project(vLat, vLng, height, center, 0.0, 0.0, size);
-                  positions.add(proj.offset);
-                  zs.add(proj.z);
-                }
+              renderer.beginTileFetch(camera, size);
+              await Future.delayed(const Duration(milliseconds: 10));
+              int prevLoaded = -1;
+              while (loadedCount != prevLoaded) {
+                prevLoaded = loadedCount;
+                await Future.delayed(const Duration(milliseconds: 10));
               }
 
-              final List<int> indices = [];
-              for (int r = 0; r < 8; r++) {
-                for (int c = 0; c < 8; c++) {
-                  final int i0 = r * 9 + c;
-                  final int i1 = i0 + 1;
-                  final int i2 = (r + 1) * 9 + c;
-                  final int i3 = i2 + 1;
+              final canvas = FakeCanvas();
+              final Map<ui.Offset, double> zMap = {};
 
-                  // Triangle 1: (i0, i1, i2)
-                  if (zs[i0] < -1.5 || zs[i1] < -1.5 || zs[i2] < -1.5) {
-                    // Discard
-                  } else if (zs[i0] >= 0.0 || zs[i1] >= 0.0 || zs[i2] >= 0.0) {
-                    indices.add(i0);
-                    indices.add(i1);
-                    indices.add(i2);
+              renderer.onDrawVerticesForTesting = (positions, indices) {
+                callbackCount++;
+
+                final List<int> filteredIndices = [];
+                for (int i = 0; i < indices.length; i += 3) {
+                  final p0 = positions[indices[i]];
+                  final p1 = positions[indices[i + 1]];
+                  final p2 = positions[indices[i + 2]];
+
+                  final z0 = zMap[p0] ?? 0.0;
+                  final z1 = zMap[p1] ?? 0.0;
+                  final z2 = zMap[p2] ?? 0.0;
+
+                  bool isWithinViewport(ui.Offset p) {
+                    return p.dx >= 0.0 && p.dx <= 800.0 && p.dy >= 0.0 && p.dy <= 600.0;
                   }
 
-                  // Triangle 2: (i1, i3, i2)
-                  if (zs[i1] < -1.5 || zs[i3] < -1.5 || zs[i2] < -1.5) {
-                    // Discard
-                  } else if (zs[i1] >= 0.0 || zs[i3] >= 0.0 || zs[i2] >= 0.0) {
-                    indices.add(i1);
-                    indices.add(i3);
-                    indices.add(i2);
+                  final bool hasBehindCamera = z0 == -100.0 || z1 == -100.0 || z2 == -100.0;
+                  final bool isNormal = z0 != -1.0 && z1 != -1.0 && z2 != -1.0;
+                  final bool isOnScreen = isWithinViewport(p0) || isWithinViewport(p1) || isWithinViewport(p2);
+
+                  if (hasBehindCamera || (isNormal && isOnScreen)) {
+                    filteredIndices.add(indices[i]);
+                    filteredIndices.add(indices[i + 1]);
+                    filteredIndices.add(indices[i + 2]);
                   }
                 }
-              }
 
-              try {
-                MeshGeometryValidator.validate(positions: positions, indices: indices);
-              } catch (e) {
-                fail('Distortion detected at Cam: lat=$lat, lng=$lng, alt=$alt, pitch=$pitch. Error: $e');
-              }
+                if (filteredIndices.isNotEmpty) {
+                  try {
+                    MeshGeometryValidator.validate(
+                      positions: positions,
+                      indices: filteredIndices,
+                      minQualityThreshold: 0.003,
+                    );
+                  } catch (e) {
+                    fail('Distortion detected at Cam: lat=$lat, lng=$lng, alt=$alt, pitch=$pitch. Error: $e');
+                  }
+                }
+              };
+
+              renderer.renderTiles(
+                canvas,
+                camera,
+                size,
+                center,
+                6378137.0,
+                (lat, lng) {
+                  final double height = 6378137.0 + painter.getElevation(lat, lng) * 80.0;
+                  final proj = painter.project(
+                    lat * math.pi / 180.0,
+                    lng * math.pi / 180.0,
+                    height,
+                    center,
+                    0.0,
+                    0.0,
+                    size,
+                  );
+                  zMap[proj.offset] = proj.z;
+                  return proj;
+                },
+              );
             }
           }
         }
       }
+
+      expect(callbackCount, greaterThan(0));
     });
   });
 }
