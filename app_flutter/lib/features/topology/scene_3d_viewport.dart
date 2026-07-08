@@ -1220,7 +1220,8 @@ class Scene3DViewportPainter extends CustomPainter {
 
     // Focal length (45-degree FOV)
     final double F = size.shortestSide * 1.2;
-    final double pScale = depth <= 0.0 ? 1.0 : F / depth;
+    final double safeDepth = depth <= 10000.0 ? 10000.0 : depth;
+    final double pScale = F / safeDepth;
 
     final double rx_pixel = x_cam * pScale;
     final double ry_pixel = y_cam * pScale;
@@ -1322,7 +1323,8 @@ class Scene3DViewportPainter extends CustomPainter {
 
       final double depth = -z_cam;
       final double F = size.shortestSide * 1.2;
-      final double pScale = depth <= 0.0 ? 1.0 : F / depth;
+      final double safeDepth = depth <= 10000.0 ? 10000.0 : depth;
+      final double pScale = F / safeDepth;
 
       final double rx_pixel = x_cam * pScale;
       final double ry_pixel = y_cam * pScale;
