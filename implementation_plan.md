@@ -50,13 +50,33 @@ This plan details the changes to create a visual regression test suite and fix t
 - `exaggerated_fuji_node.png`
 - `correct_view_culling.png`
 
+## Optimization Changes
+
+### 1. `app_flutter/lib/features/topology/scene_3d_viewport.dart`
+- In `Scene3DViewportPainter` class:
+  - Add a static cache map for node elevations:
+    `static final Map<String, double> _nodeElevationCache = {};`
+  - In `paint` method:
+    - Inside the node project loop (around lines 1812 and 1825), replace:
+      ```dart
+      final double terrainElev = getElevation(latDeg, currentLng * 180.0 / math.pi);
+      ```
+      with:
+      ```dart
+      final String cacheKey = '$id-$verticalExaggeration-$elevationActive';
+      final double terrainElev = _nodeElevationCache.putIfAbsent(cacheKey, () => getElevation(latDeg, lngDeg));
+      ```
+
 ## Verification Plan
 1. Run the test suite on the buggy code to confirm the non-visual check fails:
    `flutter test test/topology/scene_3d_viewport_golden_test.dart`
 2. Apply the mathematical fix in `scene_3d_viewport.dart`.
 3. Generate the corrected golden images:
    `flutter test --update-goldens test/topology/scene_3d_viewport_golden_test.dart`
-4. Run the entire test suite to ensure all unit and visual tests pass:
+4. Run the node elevation optimization benchmark to ensure performance matches instructions (< 22ms average frame render time):
+   `flutter test test/features/topology/globe_rendering_benchmark_test.dart`
+5. Run the entire test suite to ensure all unit and visual tests pass:
    `flutter test`
-5. Verify `git diff` to make sure changes are clean and correct.
-6. Commit changes and push to origin tracking branch.
+6. Verify `git diff` to make sure changes are clean and correct.
+7. Commit changes and push to origin tracking branch.
+

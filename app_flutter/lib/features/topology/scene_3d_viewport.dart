@@ -1022,6 +1022,8 @@ class Scene3DViewportState extends State<Scene3DViewport> {
 }
 
 class Scene3DViewportPainter extends CustomPainter {
+  static final Map<String, double> _nodeElevationCache = {};
+
   final VirtualCamera camera;
   final String activeStyle;
   final String astronomicalBody;
@@ -1748,6 +1750,7 @@ class Scene3DViewportPainter extends CustomPainter {
     final Map<String, ProjectedPoint> allProjectedNodes = {};
     final List<Offset> groundGlowPoints = [];
     final List<Offset> groundPoints = [];
+    final String keySuffix = '-$verticalExaggeration-$elevationActive';
 
     for (final node in nodes) {
       final String id = node.id;
@@ -1809,7 +1812,8 @@ class Scene3DViewportPainter extends CustomPainter {
       double finalHeight = orbitHeight;
       if (type == 'ground' || type == 'underwater') {
         if (elevationActive) {
-          final double terrainElev = getElevation(latDeg, currentLng * 180.0 / math.pi);
+          final String cacheKey = id + keySuffix;
+          final double terrainElev = _nodeElevationCache.putIfAbsent(cacheKey, () => getElevation(latDeg, lngDeg));
           finalHeight = 6378137.0 + (terrainElev + alt) * verticalExaggeration;
         } else {
           finalHeight = 6378137.0 + alt;
@@ -1822,7 +1826,8 @@ class Scene3DViewportPainter extends CustomPainter {
 
         // Draw vertical drop line from satellite to surface
         if (type == 'space' && showDropLines) {
-          final double terrainElev = getElevation(latDeg, currentLng * 180.0 / math.pi);
+          final String cacheKey = id + keySuffix;
+          final double terrainElev = _nodeElevationCache.putIfAbsent(cacheKey, () => getElevation(latDeg, lngDeg));
           final double surfaceHeight = 6378137.0 + terrainElev * verticalExaggeration;
           final surfaceProj = project(lat, currentLng, surfaceHeight, center, rotationAngle, tilt, size);
 
