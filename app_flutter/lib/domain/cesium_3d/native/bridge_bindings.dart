@@ -156,9 +156,6 @@ typedef BridgeEcefToCartographicDart = int Function(
 typedef BridgeFreeStringNative = Void Function(Pointer<Utf8> str);
 typedef BridgeFreeStringDart = void Function(Pointer<Utf8> str);
 
-typedef BridgeErrorMessageNative = Pointer<Utf8> Function(Int32 errorCode);
-typedef BridgeErrorMessageDart = Pointer<Utf8> Function(int errorCode);
-
 class CesiumNativeBindings {
   final DynamicLibrary _lib;
 
@@ -175,7 +172,6 @@ class CesiumNativeBindings {
   late final BridgeCartographicToEcefDart cartographicToEcef;
   late final BridgeEcefToCartographicDart ecefToCartographic;
   late final BridgeFreeStringDart freeString;
-  late final BridgeErrorMessageDart errorMessage;
 
   CesiumNativeBindings(this._lib) {
     initialize = _lib.lookupFunction<BridgeInitializeNative, BridgeInitializeDart>('bridge_initialize');
@@ -191,7 +187,6 @@ class CesiumNativeBindings {
     cartographicToEcef = _lib.lookupFunction<BridgeCartographicToEcefNative, BridgeCartographicToEcefDart>('bridge_cartographic_to_ecef');
     ecefToCartographic = _lib.lookupFunction<BridgeEcefToCartographicNative, BridgeEcefToCartographicDart>('bridge_ecef_to_cartographic');
     freeString = _lib.lookupFunction<BridgeFreeStringNative, BridgeFreeStringDart>('bridge_free_string');
-    errorMessage = _lib.lookupFunction<BridgeErrorMessageNative, BridgeErrorMessageDart>('bridge_error_message');
   }
 
   static CesiumNativeBindings load() {
