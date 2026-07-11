@@ -1265,8 +1265,8 @@ class Scene3DViewportPainter extends CustomPainter {
     final double z1 = z_enu;
 
     final double x_cam = x1;
-    final double y_cam = y1 * cosA - z1 * sinA;
-    final double z_cam = y1 * sinA + z1 * cosA;
+    final double y_cam = y1 * cosA + z1 * sinA;
+    final double z_cam = -y1 * sinA + z1 * cosA;
 
     // Optical axis is along negative z_cam
     final double depth = -z_cam;
@@ -1377,8 +1377,8 @@ class Scene3DViewportPainter extends CustomPainter {
       final double z1 = z_enu;
 
       final double x_cam = x1;
-      final double y_cam = y1 * cosA - z1 * sinA;
-      final double z_cam = y1 * sinA + z1 * cosA;
+      final double y_cam = y1 * cosA + z1 * sinA;
+      final double z_cam = -y1 * sinA + z1 * cosA;
 
       final double depth = -z_cam;
       final double F = size.shortestSide * 1.2;

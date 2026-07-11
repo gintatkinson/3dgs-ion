@@ -1,191 +1,62 @@
-# Implementation Plan - ECEF Scroll-Zoom Math Corrections
+# Implementation Plan - Optical Axis Projection Fix and Visual Regression Tests
 
-This plan details the surgical changes to implement ECEF scroll-zoom math corrections and align tests.
+This plan details the changes to create a visual regression test suite and fix the optical axis projection tilt/pitch rotation signs.
 
-## Target Files & Proposed Diffs
+## Target Files & Proposed Changes
 
-### 1. `app_flutter/lib/domain/cesium_3d/camera_controller.dart`
-- Update constructor to handle absolute ECEF conversion:
-```dart
-  CameraController(VirtualCamera camera) : _camera = camera.altitude < 6378137.0 ? VirtualCamera.clamped(
-    latitude: camera.latitude,
-    longitude: camera.longitude,
-    altitude: 6378137.0 + camera.altitude,
-    heading: camera.heading,
-    pitch: camera.pitch,
-    roll: camera.roll,
-  ) : camera;
-```
-- Update `updateCamera` to handle absolute conversion for relative altitude (`< 6378137.0`) input before clamping:
-```dart
-  void updateCamera(VirtualCamera camera) {
-    final absoluteCamera = camera.altitude < 6378137.0 ? VirtualCamera.clamped(
-      latitude: camera.latitude,
-      longitude: camera.longitude,
-      altitude: 6378137.0 + camera.altitude,
-      heading: camera.heading,
-      pitch: camera.pitch,
-      roll: camera.roll,
-    ) : camera;
-    final double targetAlt = _clampAltitudeToTerrain(absoluteCamera.latitude, absoluteCamera.longitude, absoluteCamera.altitude);
-    final clampedCam = VirtualCamera.clamped(
-      latitude: absoluteCamera.latitude,
-      longitude: absoluteCamera.longitude,
-      altitude: targetAlt,
-      heading: absoluteCamera.heading,
-      pitch: absoluteCamera.pitch,
-      roll: absoluteCamera.roll,
-    );
-    if (_camera == clampedCam) return;
-    _camera = clampedCam;
-    _targetCamera = null;
-    _startCamera = null;
-    notifyListeners();
-  }
-```
-- Update `_clampAltitudeToTerrain` to compute `minAlt` as absolute:
-```dart
-  double _clampAltitudeToTerrain(double lat, double lng, double targetAlt) {
-    final double terrainH = _getTerrainHeight(lat, lng);
-    final double minAlt = 6378137.0 + terrainH + minAltitude;
-    return targetAlt < minAlt ? minAlt : targetAlt;
-  }
-```
-- Update `pan` to compute relative altitude for the drag speed factor:
-```dart
-  void pan(Offset delta, [double shortestSide = 800.0]) {
-    if (shortestSide <= 0.0 || shortestSide.isNaN) {
-      shortestSide = 800.0;
-    }
-    final double factor = (_camera.altitude - 6378137.0 + 500000.0) * 2.8074e-5 / shortestSide;
-    // ... rest remains same ...
-  }
-```
-- Update `zoom` (lines 166-181) to compute relative height above terrain by subtracting `6378137.0`:
-```dart
-  void zoom(double scrollDelta) {
-    final double terrainH = _getTerrainHeight(_camera.latitude, _camera.longitude);
-    final double currentHeightAGL = _camera.altitude - (6378137.0 + terrainH);
-    final double targetHeightAGL = currentHeightAGL + scrollDelta * scrollSensitivity;
-    final double clampedHeightAGL = targetHeightAGL.clamp(minAltitude, maxAltitude);
-    final double newAlt = 6378137.0 + clampedHeightAGL + terrainH;
-    _camera = VirtualCamera.clamped(
-      latitude: _camera.latitude,
-      longitude: _camera.longitude,
-      altitude: newAlt,
-      heading: _camera.heading,
-      pitch: _camera.pitch,
-      roll: _camera.roll,
-    );
-    notifyListeners();
-  }
-```
-- Update `zoomInteractive` (lines 183-199) to compute relative height above terrain by subtracting `6378137.0`, clamp `scrollDelta` to `[-100.0, 100.0]`, and change the multiplier from `0.005` to `0.001`:
-```dart
-  void zoomInteractive(double scrollDelta) {
-    final double clampedDelta = scrollDelta.clamp(-100.0, 100.0);
-    final double factor = math.exp(clampedDelta * 0.001);
-    final double terrainH = _getTerrainHeight(_camera.latitude, _camera.longitude);
-    final double currentHeightAGL = _camera.altitude - (6378137.0 + terrainH);
-    final double targetHeightAGL = currentHeightAGL * factor;
-    final double clampedHeightAGL = targetHeightAGL.clamp(minAltitude, maxAltitude);
-    final double newAlt = 6378137.0 + clampedHeightAGL + terrainH;
-    _camera = VirtualCamera.clamped(
-      latitude: _camera.latitude,
-      longitude: _camera.longitude,
-      altitude: newAlt,
-      heading: _camera.heading,
-      pitch: _camera.pitch,
-      roll: _camera.roll,
-    );
-    notifyListeners();
-  }
-```
+### 1. `app_flutter/lib/features/topology/scene_3d_viewport.dart`
+- In `project` method (around line 1268-1269):
+  Replace:
+  ```dart
+  final double y_cam = y1 * cosA - z1 * sinA;
+  final double z_cam = y1 * sinA + z1 * cosA;
+  ```
+  with:
+  ```dart
+  final double y_cam = y1 * cosA + z1 * sinA;
+  final double z_cam = -y1 * sinA + z1 * cosA;
+  ```
+- In `_getHorizonPath` method (around line 1380-1381):
+  Replace:
+  ```dart
+  final double y_cam = y1 * cosA - z1 * sinA;
+  final double z_cam = y1 * sinA + z1 * cosA;
+  ```
+  with:
+  ```dart
+  final double y_cam = y1 * cosA + z1 * sinA;
+  final double z_cam = -y1 * sinA + z1 * cosA;
+  ```
 
-### 2. `app_flutter/test/cesium_3d/camera_collision_test.dart`
-- Update assertions expecting relative altitudes to expect absolute ECEF altitudes by adding `6378137.0`:
-  - `expect(controller.current.altitude, equals(6378137.0 + 100.0));`
-  - `expect(controller.current.altitude, closeTo(6378137.0 + expectedClamp, 1.0));`
+### 2. `app_flutter/test/topology/scene_3d_viewport_golden_test.dart`
+- Create this new visual regression test file with three test cases:
+  1. **Visual Test 1 - Stars and Sphere View**
+     - Camera latitude=0.0, longitude=0.0, altitude=20000000.0, heading=0, pitch=-90, roll=0.
+     - Empty TopologyData nodes.
+     - Settle/pump, assert match to `goldens/stars_and_sphere.png`.
+  2. **Visual Test 2 - Exaggerated Node Elevation Alignment**
+     - Camera latitude=35.3606, longitude=138.7274, altitude=1000.0, heading=0, pitch=-45, roll=0.
+     - Node at Mt. Fuji (138.7274, 35.3606) with alt=0.0.
+     - Settle/pump, assert match to `goldens/exaggerated_fuji_node.png`.
+  3. **Visual Test 3 - Forward/Backward Projection Inversion Culling**
+     - Camera latitude=35.441924, longitude=138.848037, altitude=90635.83, heading=56.65, pitch=-19.79, roll=0.
+     - Node 1: Nagoya-OPT-Core (136.90, 35.18, 0.0) - Southwest (behind camera, should be culled).
+     - Node 2: Tokyo-OPT-Core (140.00, 36.00, 0.0) - Northeast (in front of camera, should be rendered).
+     - First perform non-visual coordinate projection checks directly on the `Scene3DViewportPainter` using the buggy values to confirm the inversion bug (Nagoya projected, Tokyo culled).
+     - Assert visual identity matching `goldens/correct_view_culling.png`.
 
-### 3. `app_flutter/test/topology/scroll_zoom_test.dart`
-- Initial camera has altitude `1000.0`. Since `1000.0 < 6378137.0`, `CameraController` constructor clamps/transforms it to:
-  `6378137.0 + 1000.0 = 6379137.0` (absolute ECEF altitude).
-- In the test, a scroll event of `Offset(0, 53)` triggers `zoomInteractive(53)`.
-- Inside `zoomInteractive(53)`:
-  - `clampedDelta = 53.0`
-  - `factor = math.exp(53.0 * 0.001) = 1.05443242095`
-  - `terrainH = 0.0`
-  - `currentHeightAGL = 6379137.0 - (6378137.0 + 0) = 1000.0`
-  - `targetHeightAGL = 1000.0 * 1.05443242095 = 1054.43242095`
-  - `clampedHeightAGL = 1054.43242095`
-  - `newAlt = 6378137.0 + 1054.43242095 + 0.0 = 6379191.43242095`
-- The expected target absolute altitude is therefore `6379191.43` (rounded). We update the test assertion to:
-  `expect(controller.current.altitude, closeTo(6379191.43, 0.01));`
-
-### 4. `app_flutter/test/cesium_3d/camera_controller_test.dart`
-- Update assertions expecting relative altitudes to expect absolute ECEF altitudes by adding `6378137.0`:
-  - Line 40: `expect(after.altitude, equals(6378137.0 + 500.0));`
-  - Line 52: `expect(after.altitude, equals(6378137.0 + 500.0));`
-  - Line 118: `expect(c.current.altitude, lessThan(6378137.0 + 500.0));`
-  - Line 159: `expect(c.current.altitude, equals(6378137.0 + CameraController.minAltitude));`
-  - Line 165: `expect(c.current.altitude, equals(6378137.0 + CameraController.maxAltitude));`
-  - Line 172: `expect(c.current.altitude, lessThan(6378137.0 + 500000));`
-  - Line 178: `expect(c.current.altitude, greaterThan(6378137.0 + 500000));`
-  - Line 184: `expect(c.current.altitude, closeTo(6378137.0 + 500000 - CameraController.scrollSensitivity, 0.01));`
-  - Line 186: `expect(c.current.altitude, closeTo(6378137.0 + 500000, 0.01));`
-  - Line 203: `expect(c.current.altitude, closeTo(6378137.0 + 500000 - 5.0, 0.01));`
-  - Line 209: `expect(c.current.altitude, equals(6378137.0 + CameraController.minAltitude));`
-  - Line 215: `expect(c.current.altitude, equals(6378137.0 + CameraController.maxAltitude));`
-
-### 5. `app_flutter/lib/features/topology/scene_3d_viewport.dart`
-- Surgically modify the file to replace the 4 occurrences of `cRad` calculation:
-  - Occurrence 1 (hitTest, lines 424-425):
-    Replace:
-    ```dart
-    final double camElevation = _elevationActive ? Scene3DViewportPainter.getElevationStatic(camera.latitude, camera.longitude, true) * widget.verticalExaggeration : 0.0;
-    final double cRad = camera.altitude + camElevation;
-    ```
-    with:
-    ```dart
-    final double cRad = camera.altitude;
-    ```
-  - Occurrence 2 (project, lines 1201-1202):
-    Replace:
-    ```dart
-    final double camElevation = elevationActive ? getElevation(camera.latitude, camera.longitude) * verticalExaggeration : 0.0;
-    final double cRad = camera.altitude + camElevation;
-    ```
-    with:
-    ```dart
-    final double cRad = camera.altitude;
-    ```
-  - Occurrence 3 (_getHorizonPath, lines 1322-1323):
-    Replace:
-    ```dart
-    final double camElevation = elevationActive ? getElevation(camera.latitude, camera.longitude) * verticalExaggeration : 0.0;
-    final double cRad = camera.altitude + camElevation;
-    ```
-    with:
-    ```dart
-    final double cRad = camera.altitude;
-    ```
-  - Occurrence 4 (paint, lines 1425-1426):
-    Replace:
-    ```dart
-    final double camElevation = elevationActive ? getElevation(camera.latitude, camera.longitude) * verticalExaggeration : 0.0;
-    final double cRad = camera.altitude + camElevation;
-    ```
-    with:
-    ```dart
-    final double cRad = camera.altitude;
-    ```
+### 3. Golden Images in `app_flutter/test/topology/goldens/`
+- `stars_and_sphere.png`
+- `exaggerated_fuji_node.png`
+- `correct_view_culling.png`
 
 ## Verification Plan
-
-- Run the flutter tests:
-  `flutter test`
-- Ensure all tests pass.
-- Verify `git diff origin/main` matches expectations and there are no extraneous changes.
-- Push and check remote sync.
-
-
+1. Run the test suite on the buggy code to confirm the non-visual check fails:
+   `flutter test test/topology/scene_3d_viewport_golden_test.dart`
+2. Apply the mathematical fix in `scene_3d_viewport.dart`.
+3. Generate the corrected golden images:
+   `flutter test --update-goldens test/topology/scene_3d_viewport_golden_test.dart`
+4. Run the entire test suite to ensure all unit and visual tests pass:
+   `flutter test`
+5. Verify `git diff` to make sure changes are clean and correct.
+6. Commit changes and push to origin tracking branch.
