@@ -81,6 +81,9 @@ typedef BridgeInitializeDart = int Function(
 typedef BridgeShutdownNative = Void Function(BridgeHandle handle);
 typedef BridgeShutdownDart = void Function(int handle);
 
+typedef BridgeTerminateNative = Int32 Function();
+typedef BridgeTerminateDart = int Function();
+
 typedef BridgeIsReadyNative = Int32 Function(BridgeHandle handle);
 typedef BridgeIsReadyDart = int Function(int handle);
 
@@ -161,6 +164,7 @@ class CesiumNativeBindings {
 
   late final BridgeInitializeDart initialize;
   late final BridgeShutdownDart shutdown;
+  late final BridgeTerminateDart terminate;
   late final BridgeIsReadyDart isReady;
   late final BridgeGetLastErrorDart getLastError;
   late final BridgeUpdateCameraDart updateCamera;
@@ -176,6 +180,7 @@ class CesiumNativeBindings {
   CesiumNativeBindings(this._lib) {
     initialize = _lib.lookupFunction<BridgeInitializeNative, BridgeInitializeDart>('bridge_initialize');
     shutdown = _lib.lookupFunction<BridgeShutdownNative, BridgeShutdownDart>('bridge_shutdown');
+    terminate = _lib.lookupFunction<BridgeTerminateNative, BridgeTerminateDart>('bridge_terminate');
     isReady = _lib.lookupFunction<BridgeIsReadyNative, BridgeIsReadyDart>('bridge_is_ready');
     getLastError = _lib.lookupFunction<BridgeGetLastErrorNative, BridgeGetLastErrorDart>('bridge_get_last_error');
     updateCamera = _lib.lookupFunction<BridgeUpdateCameraNative, BridgeUpdateCameraDart>('bridge_update_camera');

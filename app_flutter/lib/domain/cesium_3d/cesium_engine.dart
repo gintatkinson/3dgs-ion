@@ -166,4 +166,9 @@ class CesiumEngine {
       _instance = null;
     }
   }
+
+  static void terminateLibrary() {
+    final bindings = CesiumNativeBindings.load();
+    bindings.terminate();
+  }
 }

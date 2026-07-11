@@ -64,6 +64,13 @@ void bridge_shutdown(bridge_handle_t handle) {
   }
 }
 
+int32_t bridge_terminate(void) {
+  std::lock_guard<std::mutex> lock(g_statesMutex);
+  g_states.clear();
+  g_nextHandle = 1;
+  return BRIDGE_OK;
+}
+
 int32_t bridge_is_ready(bridge_handle_t handle) {
   std::lock_guard<std::mutex> lock(g_statesMutex);
   return g_states.count(handle) ? 1 : 0;
