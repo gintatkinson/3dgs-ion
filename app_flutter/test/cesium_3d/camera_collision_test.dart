@@ -43,7 +43,7 @@ void main() {
       controller.zoom(-5000.0);
 
       // Verify camera altitude is clamped exactly at 100m above flat ocean (terrain = 0)
-      expect(controller.current.altitude, equals(100.0));
+      expect(controller.current.altitude, equals(6378137.0 + 100.0));
     });
 
     test('Nadir Zoom-in Clamps Correctly Above Amplified Mount Fuji', () {
@@ -66,7 +66,7 @@ void main() {
       const double fujiAmplifiedHeight = 3776.0 * 80.0;
       const double expectedClamp = fujiAmplifiedHeight + 100.0;
 
-      expect(controller.current.altitude, closeTo(expectedClamp, 1.0));
+      expect(controller.current.altitude, closeTo(6378137.0 + expectedClamp, 1.0));
     });
 
     test('Panning Toward Rising Terrain Automatically Lifts Camera', () {
@@ -93,7 +93,7 @@ void main() {
 
       // The terrain-aware controller must detect collision and clamp altitude to 302,180m
       const double expectedClamp = (3776.0 * 80.0) + 100.0;
-      expect(controller.current.altitude, closeTo(expectedClamp, 1.0));
+      expect(controller.current.altitude, closeTo(6378137.0 + expectedClamp, 1.0));
     });
   });
 }

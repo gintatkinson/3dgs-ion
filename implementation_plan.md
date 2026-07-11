@@ -1,140 +1,147 @@
-# Implementation Plan - ECEF Coordinate Corrections
+# Implementation Plan - ECEF Scroll-Zoom Math Corrections
 
-## 1. Objectives
-- Implement ECEF coordinate corrections in `app_flutter/lib/features/topology/scene_3d_viewport.dart` and `app_flutter/lib/domain/cesium_3d/globe_tile_renderer.dart`.
-- Correct the ground/underwater node elevation logic in `Scene3DViewportPainter` to use `getElevation`.
-- Adjust the Camera Stats HUD altitude display to show the relative altitude (subtracting Earth radius `6378137.0` and formatting).
-- Correct camera absolute radius `cRad` calculations across `scene_3d_viewport.dart` to not add Earth radius/R since `camera.altitude` already holds absolute radial distance.
-- Update `GlobeTileRenderer._visibleTiles` to compute relative altitude and use it for zoom selection and horizon angle calculations.
-- Update test cases to align with the formatted HUD output and absolute camera altitude changes.
-- Verify changes compile and pass tests.
+This plan details the surgical changes to implement ECEF scroll-zoom math corrections and align tests.
 
-## 2. File Modifications
+## Target Files & Proposed Diffs
 
-### `app_flutter/lib/features/topology/scene_3d_viewport.dart` (Modify)
-- **Mod 1: paint ground/underwater node calculation (Lines 1771-1777)**
-  - Original:
-    ```dart
-      double finalHeight = orbitHeight;
-      if (type == 'ground' || type == 'underwater') {
-        if (elevationActive) {
-          finalHeight = 6378137.0 + alt * verticalExaggeration;
-        } else {
-          finalHeight = 6378137.0 + alt;
-        }
-      }
-    ```
-  - Replacement:
-    ```dart
-      double finalHeight = orbitHeight;
-      if (type == 'ground' || type == 'underwater') {
-        if (elevationActive) {
-          final double terrainElev = getElevation(latDeg, currentLng * 180.0 / math.pi);
-          finalHeight = 6378137.0 + (terrainElev + alt) * verticalExaggeration;
-        } else {
-          finalHeight = 6378137.0 + alt;
-        }
-      }
-    ```
+### 1. `app_flutter/lib/domain/cesium_3d/camera_controller.dart`
+- Update constructor to handle absolute ECEF conversion:
+```dart
+  CameraController(VirtualCamera camera) : _camera = camera.altitude < 6378137.0 ? VirtualCamera.clamped(
+    latitude: camera.latitude,
+    longitude: camera.longitude,
+    altitude: 6378137.0 + camera.altitude,
+    heading: camera.heading,
+    pitch: camera.pitch,
+    roll: camera.roll,
+  ) : camera;
+```
+- Update `updateCamera` to handle absolute conversion for relative altitude (`< 6378137.0`) input before clamping:
+```dart
+  void updateCamera(VirtualCamera camera) {
+    final absoluteCamera = camera.altitude < 6378137.0 ? VirtualCamera.clamped(
+      latitude: camera.latitude,
+      longitude: camera.longitude,
+      altitude: 6378137.0 + camera.altitude,
+      heading: camera.heading,
+      pitch: camera.pitch,
+      roll: camera.roll,
+    ) : camera;
+    final double targetAlt = _clampAltitudeToTerrain(absoluteCamera.latitude, absoluteCamera.longitude, absoluteCamera.altitude);
+    final clampedCam = VirtualCamera.clamped(
+      latitude: absoluteCamera.latitude,
+      longitude: absoluteCamera.longitude,
+      altitude: targetAlt,
+      heading: absoluteCamera.heading,
+      pitch: absoluteCamera.pitch,
+      roll: absoluteCamera.roll,
+    );
+    if (_camera == clampedCam) return;
+    _camera = clampedCam;
+    _targetCamera = null;
+    _startCamera = null;
+    notifyListeners();
+  }
+```
+- Update `_clampAltitudeToTerrain` to compute `minAlt` as absolute:
+```dart
+  double _clampAltitudeToTerrain(double lat, double lng, double targetAlt) {
+    final double terrainH = _getTerrainHeight(lat, lng);
+    final double minAlt = 6378137.0 + terrainH + minAltitude;
+    return targetAlt < minAlt ? minAlt : targetAlt;
+  }
+```
+- Update `pan` to compute relative altitude for the drag speed factor:
+```dart
+  void pan(Offset delta, [double shortestSide = 800.0]) {
+    if (shortestSide <= 0.0 || shortestSide.isNaN) {
+      shortestSide = 800.0;
+    }
+    final double factor = (_camera.altitude - 6378137.0 + 500000.0) * 2.8074e-5 / shortestSide;
+    // ... rest remains same ...
+  }
+```
+- Update `zoom` (lines 166-181) to compute relative height above terrain by subtracting `6378137.0`:
+```dart
+  void zoom(double scrollDelta) {
+    final double terrainH = _getTerrainHeight(_camera.latitude, _camera.longitude);
+    final double currentHeightAGL = _camera.altitude - (6378137.0 + terrainH);
+    final double targetHeightAGL = currentHeightAGL + scrollDelta * scrollSensitivity;
+    final double clampedHeightAGL = targetHeightAGL.clamp(minAltitude, maxAltitude);
+    final double newAlt = 6378137.0 + clampedHeightAGL + terrainH;
+    _camera = VirtualCamera.clamped(
+      latitude: _camera.latitude,
+      longitude: _camera.longitude,
+      altitude: newAlt,
+      heading: _camera.heading,
+      pitch: _camera.pitch,
+      roll: _camera.roll,
+    );
+    notifyListeners();
+  }
+```
+- Update `zoomInteractive` (lines 183-199) to compute relative height above terrain by subtracting `6378137.0`, clamp `scrollDelta` to `[-100.0, 100.0]`, and change the multiplier from `0.005` to `0.001`:
+```dart
+  void zoomInteractive(double scrollDelta) {
+    final double clampedDelta = scrollDelta.clamp(-100.0, 100.0);
+    final double factor = math.exp(clampedDelta * 0.001);
+    final double terrainH = _getTerrainHeight(_camera.latitude, _camera.longitude);
+    final double currentHeightAGL = _camera.altitude - (6378137.0 + terrainH);
+    final double targetHeightAGL = currentHeightAGL * factor;
+    final double clampedHeightAGL = targetHeightAGL.clamp(minAltitude, maxAltitude);
+    final double newAlt = 6378137.0 + clampedHeightAGL + terrainH;
+    _camera = VirtualCamera.clamped(
+      latitude: _camera.latitude,
+      longitude: _camera.longitude,
+      altitude: newAlt,
+      heading: _camera.heading,
+      pitch: _camera.pitch,
+      roll: _camera.roll,
+    );
+    notifyListeners();
+  }
+```
 
-- **Mod 2: Camera Stats HUD altitude display (Lines 624-631)**
-  - Original:
-    ```dart
-                            Text(
-                              'Altitude: ${_cameraController.current.altitude} meters',
-                              style: const TextStyle(
-                                color: Color(0xFFE0E0E0),
-                                fontFamily: 'monospace',
-                                fontSize: 11,
-                              ),
-                            ),
-    ```
-  - Replacement:
-    ```dart
-                            Text(
-                              'Altitude: ${(_cameraController.current.altitude - 6378137.0).toStringAsFixed(2)} meters',
-                              style: const TextStyle(
-                                color: Color(0xFFE0E0E0),
-                                fontFamily: 'monospace',
-                                fontSize: 11,
-                              ),
-                            ),
-    ```
+### 2. `app_flutter/test/cesium_3d/camera_collision_test.dart`
+- Update assertions expecting relative altitudes to expect absolute ECEF altitudes by adding `6378137.0`:
+  - `expect(controller.current.altitude, equals(6378137.0 + 100.0));`
+  - `expect(controller.current.altitude, closeTo(6378137.0 + expectedClamp, 1.0));`
 
-- **Mod 3: `cRad` calculation at lines 391, 1159, 1280, 1383**
-  - Line 391 Original:
-    ```dart
-        final double cRad = 6378137.0 + camera.altitude + camElevation;
-    ```
-  - Line 391 Replacement:
-    ```dart
-        final double cRad = camera.altitude + camElevation;
-    ```
-  - Line 1159 Original:
-    ```dart
-        final double cRad = R + camera.altitude + camElevation;
-    ```
-  - Line 1159 Replacement:
-    ```dart
-        final double cRad = camera.altitude + camElevation;
-    ```
-  - Line 1280 Original:
-    ```dart
-        final double cRad = R + camera.altitude + camElevation;
-    ```
-  - Line 1280 Replacement:
-    ```dart
-        final double cRad = camera.altitude + camElevation;
-    ```
-  - Line 1383 Original:
-    ```dart
-        final double cRad = 6378137.0 + camera.altitude + camElevation;
-    ```
-  - Line 1383 Replacement:
-    ```dart
-        final double cRad = camera.altitude + camElevation;
-    ```
+### 3. `app_flutter/test/topology/scroll_zoom_test.dart`
+- Initial camera has altitude `1000.0`. Since `1000.0 < 6378137.0`, `CameraController` constructor clamps/transforms it to:
+  `6378137.0 + 1000.0 = 6379137.0` (absolute ECEF altitude).
+- In the test, a scroll event of `Offset(0, 53)` triggers `zoomInteractive(53)`.
+- Inside `zoomInteractive(53)`:
+  - `clampedDelta = 53.0`
+  - `factor = math.exp(53.0 * 0.001) = 1.05443242095`
+  - `terrainH = 0.0`
+  - `currentHeightAGL = 6379137.0 - (6378137.0 + 0) = 1000.0`
+  - `targetHeightAGL = 1000.0 * 1.05443242095 = 1054.43242095`
+  - `clampedHeightAGL = 1054.43242095`
+  - `newAlt = 6378137.0 + 1054.43242095 + 0.0 = 6379191.43242095`
+- The expected target absolute altitude is therefore `6379191.43` (rounded). We update the test assertion to:
+  `expect(controller.current.altitude, closeTo(6379191.43, 0.01));`
 
-### `app_flutter/lib/domain/cesium_3d/globe_tile_renderer.dart` (Modify)
-- **Mod 1: `_visibleTiles` method zoom/horizon calculation (Lines 152-160)**
-  - Original:
-    ```dart
-        final zoom = _zoomForAltitude(camera.altitude, viewportSize.width);
-        final center = _latLngToTile(camera.latitude, camera.longitude, zoom);
-        final List<TileCoord> tiles = [];
+### 4. `app_flutter/test/cesium_3d/camera_controller_test.dart`
+- Update assertions expecting relative altitudes to expect absolute ECEF altitudes by adding `6378137.0`:
+  - Line 40: `expect(after.altitude, equals(6378137.0 + 500.0));`
+  - Line 52: `expect(after.altitude, equals(6378137.0 + 500.0));`
+  - Line 118: `expect(c.current.altitude, lessThan(6378137.0 + 500.0));`
+  - Line 159: `expect(c.current.altitude, equals(6378137.0 + CameraController.minAltitude));`
+  - Line 165: `expect(c.current.altitude, equals(6378137.0 + CameraController.maxAltitude));`
+  - Line 172: `expect(c.current.altitude, lessThan(6378137.0 + 500000));`
+  - Line 178: `expect(c.current.altitude, greaterThan(6378137.0 + 500000));`
+  - Line 184: `expect(c.current.altitude, closeTo(6378137.0 + 500000 - CameraController.scrollSensitivity, 0.01));`
+  - Line 186: `expect(c.current.altitude, closeTo(6378137.0 + 500000, 0.01));`
+  - Line 203: `expect(c.current.altitude, closeTo(6378137.0 + 500000 - 5.0, 0.01));`
+  - Line 209: `expect(c.current.altitude, equals(6378137.0 + CameraController.minAltitude));`
+  - Line 215: `expect(c.current.altitude, equals(6378137.0 + CameraController.maxAltitude));`
 
-        // Horizon angle theta = acos(R / (R + h)) where R = 6378137.0
-        final double R = 6378137.0;
-        final double h = camera.altitude;
-        final double theta = math.acos(R / (R + h));
-    ```
-  - Replacement:
-    ```dart
-        final double R = 6378137.0;
-        final double relativeAlt = camera.altitude < R ? camera.altitude : camera.altitude - R;
-        final zoom = _zoomForAltitude(relativeAlt, viewportSize.width);
-        final center = _latLngToTile(camera.latitude, camera.longitude, zoom);
-        final List<TileCoord> tiles = [];
+## Verification Plan
 
-        // Horizon angle theta = acos(R / (R + h)) where R = 6378137.0
-        final double h = relativeAlt < 0.1 ? 0.1 : relativeAlt;
-        final double theta = math.acos(R / (R + h));
-    ```
+- Run the flutter tests:
+  `flutter test test/cesium_3d/camera_collision_test.dart test/topology/scroll_zoom_test.dart test/cesium_3d/camera_controller_test.dart`
+- Ensure all tests pass.
+- Verify `git diff origin/main` matches expectations and there are no extraneous changes.
+- Push and check remote sync.
 
-### `app_flutter/test/topology/scene_3d_viewport_test.dart` (Modify)
-- Document test updates for `scene_3d_viewport_test.dart`:
-  - Set camera altitude at line 110 to `6378137.0 + 10000000.0` (absolute distance from Earth center).
-  - Update `cRad` calculation at line 161 to use `camera.altitude` directly instead of adding `R`.
-
-### `app_flutter/test/cesium_3d/scroll_zoom_test.dart` (Modify)
-- Update HUD text search from `10000.0 meters` to `10000.00 meters` (due to new `toStringAsFixed(2)` formatting).
-
-### `app_flutter/test/cesium_3d/double_click_fly_test.dart` (Modify)
-- Update camera test setup to use absolute altitude (`6378137.0 + 100000.0`) and update assertions accordingly.
-
-## 3. Success / Verification Criteria
-- Run `flutter test test/topology/scene_3d_viewport_test.dart` and confirm all tests pass.
-- Run `flutter test test/cesium_3d/globe_tile_renderer_test.dart` and confirm all tests pass.
-- Run `flutter test test/cesium_3d/adversarial_fuzzer_test.dart` and confirm all tests pass.
-- Run `flutter test test/features/topology/globe_rendering_benchmark_test.dart` and confirm all tests pass.
-- Ensure no compilation or lint errors.

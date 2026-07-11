@@ -26,25 +26,40 @@ class CameraController extends ChangeNotifier {
 
   double _clampAltitudeToTerrain(double lat, double lng, double targetAlt) {
     final double terrainH = _getTerrainHeight(lat, lng);
-    final double minAlt = terrainH + minAltitude;
+    final double minAlt = 6378137.0 + terrainH + minAltitude;
     return targetAlt < minAlt ? minAlt : targetAlt;
   }
 
-  CameraController(this._camera);
+  CameraController(VirtualCamera camera) : _camera = camera.altitude < 6378137.0 ? VirtualCamera.clamped(
+    latitude: camera.latitude,
+    longitude: camera.longitude,
+    altitude: 6378137.0 + camera.altitude,
+    heading: camera.heading,
+    pitch: camera.pitch,
+    roll: camera.roll,
+  ) : camera;
 
   VirtualCamera get current => _camera;
 
   bool get isFlying => _targetCamera != null;
 
   void updateCamera(VirtualCamera camera) {
-    final double targetAlt = _clampAltitudeToTerrain(camera.latitude, camera.longitude, camera.altitude);
-    final clampedCam = VirtualCamera.clamped(
+    final absoluteCamera = camera.altitude < 6378137.0 ? VirtualCamera.clamped(
       latitude: camera.latitude,
       longitude: camera.longitude,
-      altitude: targetAlt,
+      altitude: 6378137.0 + camera.altitude,
       heading: camera.heading,
       pitch: camera.pitch,
       roll: camera.roll,
+    ) : camera;
+    final double targetAlt = _clampAltitudeToTerrain(absoluteCamera.latitude, absoluteCamera.longitude, absoluteCamera.altitude);
+    final clampedCam = VirtualCamera.clamped(
+      latitude: absoluteCamera.latitude,
+      longitude: absoluteCamera.longitude,
+      altitude: targetAlt,
+      heading: absoluteCamera.heading,
+      pitch: absoluteCamera.pitch,
+      roll: absoluteCamera.roll,
     );
     if (_camera == clampedCam) return;
     _camera = clampedCam;
@@ -122,7 +137,7 @@ class CameraController extends ChangeNotifier {
     if (shortestSide <= 0.0 || shortestSide.isNaN) {
       shortestSide = 800.0;
     }
-    final double factor = (_camera.altitude + 500000.0) * 2.8074e-5 / shortestSide;
+    final double factor = (_camera.altitude - 6378137.0 + 500000.0) * 2.8074e-5 / shortestSide;
     final double radH = _camera.heading * math.pi / 180.0;
     final double cosH = math.cos(radH);
     final double sinH = math.sin(radH);
@@ -165,10 +180,10 @@ class CameraController extends ChangeNotifier {
 
   void zoom(double scrollDelta) {
     final double terrainH = _getTerrainHeight(_camera.latitude, _camera.longitude);
-    final double currentHeightAGL = _camera.altitude - terrainH;
+    final double currentHeightAGL = _camera.altitude - (6378137.0 + terrainH);
     final double targetHeightAGL = currentHeightAGL + scrollDelta * scrollSensitivity;
     final double clampedHeightAGL = targetHeightAGL.clamp(minAltitude, maxAltitude);
-    final double newAlt = clampedHeightAGL + terrainH;
+    final double newAlt = 6378137.0 + clampedHeightAGL + terrainH;
     _camera = VirtualCamera.clamped(
       latitude: _camera.latitude,
       longitude: _camera.longitude,
@@ -181,12 +196,13 @@ class CameraController extends ChangeNotifier {
   }
 
   void zoomInteractive(double scrollDelta) {
-    final double factor = math.exp(scrollDelta * 0.005);
+    final double clampedDelta = scrollDelta.clamp(-100.0, 100.0);
+    final double factor = math.exp(clampedDelta * 0.001);
     final double terrainH = _getTerrainHeight(_camera.latitude, _camera.longitude);
-    final double currentHeightAGL = _camera.altitude - terrainH;
+    final double currentHeightAGL = _camera.altitude - (6378137.0 + terrainH);
     final double targetHeightAGL = currentHeightAGL * factor;
     final double clampedHeightAGL = targetHeightAGL.clamp(minAltitude, maxAltitude);
-    final double newAlt = clampedHeightAGL + terrainH;
+    final double newAlt = 6378137.0 + clampedHeightAGL + terrainH;
     _camera = VirtualCamera.clamped(
       latitude: _camera.latitude,
       longitude: _camera.longitude,
