@@ -20,7 +20,6 @@ add_library(cesium_native_bridge SHARED
   src/bridge.cpp
   src/camera_marshal.cpp
   src/tile_data_marshal.cpp
-  src/resource_manager.cpp
   src/error_propagator.cpp
 )
 

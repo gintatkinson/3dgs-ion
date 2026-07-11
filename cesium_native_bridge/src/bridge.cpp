@@ -112,7 +112,7 @@ int32_t bridge_request_tile_data(
 }
 
 void bridge_free_string(char* str) {
-  free(str);
+  if (str) { free(str); }
 }
 
 int32_t bridge_cartographic_to_ecef(

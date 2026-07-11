@@ -150,12 +150,6 @@ typedef BridgeEcefToCartographicDart = int Function(
   Pointer<Double> outLatDeg, Pointer<Double> outLngDeg, Pointer<Double> outAltM,
 );
 
-typedef BridgeAllocNative = Pointer<Void> Function(Int32 size);
-typedef BridgeAllocDart = Pointer<Void> Function(int size);
-
-typedef BridgeFreeNative = Void Function(Pointer<Void> ptr);
-typedef BridgeFreeDart = void Function(Pointer<Void> ptr);
-
 typedef BridgeFreeStringNative = Void Function(Pointer<Utf8> str);
 typedef BridgeFreeStringDart = void Function(Pointer<Utf8> str);
 
@@ -176,8 +170,6 @@ class CesiumNativeBindings {
   late final BridgeRequestTileDataDart requestTileData;
   late final BridgeCartographicToEcefDart cartographicToEcef;
   late final BridgeEcefToCartographicDart ecefToCartographic;
-  late final BridgeAllocDart alloc;
-  late final BridgeFreeDart free;
   late final BridgeFreeStringDart freeString;
   late final BridgeErrorMessageDart errorMessage;
 
@@ -193,8 +185,6 @@ class CesiumNativeBindings {
     requestTileData = _lib.lookupFunction<BridgeRequestTileDataNative, BridgeRequestTileDataDart>('bridge_request_tile_data');
     cartographicToEcef = _lib.lookupFunction<BridgeCartographicToEcefNative, BridgeCartographicToEcefDart>('bridge_cartographic_to_ecef');
     ecefToCartographic = _lib.lookupFunction<BridgeEcefToCartographicNative, BridgeEcefToCartographicDart>('bridge_ecef_to_cartographic');
-    alloc = _lib.lookupFunction<BridgeAllocNative, BridgeAllocDart>('bridge_alloc');
-    free = _lib.lookupFunction<BridgeFreeNative, BridgeFreeDart>('bridge_free');
     freeString = _lib.lookupFunction<BridgeFreeStringNative, BridgeFreeStringDart>('bridge_free_string');
     errorMessage = _lib.lookupFunction<BridgeErrorMessageNative, BridgeErrorMessageDart>('bridge_error_message');
   }
