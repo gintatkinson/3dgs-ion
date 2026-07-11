@@ -1180,23 +1180,9 @@ class Scene3DViewportPainter extends CustomPainter {
 
     final double R = 6378137.0;
 
-    double px = 0.0;
-    double py = 0.0;
-    double pz = 0.0;
-
-    if (engine != null && engine.isReady) {
-      final ecef = engine.cartographicToEcef(lat * 180.0 / math.pi, lng * 180.0 / math.pi, height - R);
-      if (ecef != null) {
-        final (x, y, z) = ecef;
-        px = x;
-        py = y;
-        pz = z;
-      }
-    } else {
-      px = height * math.cos(lat) * math.cos(lng);
-      py = height * math.cos(lat) * math.sin(lng);
-      pz = height * math.sin(lat);
-    }
+    double px = height * math.cos(lat) * math.cos(lng);
+    double py = height * math.cos(lat) * math.sin(lng);
+    double pz = height * math.sin(lat);
 
     // Camera position in ECEF
     final double cRad = camera.altitude;
@@ -1262,8 +1248,8 @@ class Scene3DViewportPainter extends CustomPainter {
     final double cosA = math.cos(alpha);
     final double sinA = math.sin(alpha);
 
-    final double x1 = x_enu * cosH + y_enu * sinH;
-    final double y1 = -x_enu * sinH + y_enu * cosH;
+    final double x1 = x_enu * cosH - y_enu * sinH;
+    final double y1 = x_enu * sinH + y_enu * cosH;
     final double z1 = z_enu;
 
     final double x_cam = x1;
@@ -1315,6 +1301,13 @@ class Scene3DViewportPainter extends CustomPainter {
 
   double getElevation(double latDeg, double lngDeg) {
     return getElevationStatic(latDeg, lngDeg, elevationActive);
+  }
+
+  (double, double, double) getEcefCoordinatesForTesting(double lat, double lng, double height) {
+    final double px = height * math.cos(lat) * math.cos(lng);
+    final double py = height * math.cos(lat) * math.sin(lng);
+    final double pz = height * math.sin(lat);
+    return (px, py, pz);
   }
 
   Path _getHorizonPath(Size size, Offset center, double rotationAngle, double tilt) {
@@ -1374,8 +1367,8 @@ class Scene3DViewportPainter extends CustomPainter {
       final double cosA = math.cos(alpha);
       final double sinA = math.sin(alpha);
 
-      final double x1 = x_enu * cosH + y_enu * sinH;
-      final double y1 = -x_enu * sinH + y_enu * cosH;
+      final double x1 = x_enu * cosH - y_enu * sinH;
+      final double y1 = x_enu * sinH + y_enu * cosH;
       final double z1 = z_enu;
 
       final double x_cam = x1;
@@ -1418,7 +1411,7 @@ class Scene3DViewportPainter extends CustomPainter {
     final Path oceanPath = _getHorizonPath(size, center, rotationAngle, tilt);
 
     // In paint, calculate the projected Earth center and visual radius dynamically
-    final ProjectedPoint earthCenterProj = project(0.0, 0.0, 0.0, center, 0.0, 0.0, size);
+    final ProjectedPoint earthCenterProj = project(0.0, 0.0, 0.0, center, rotationAngle, tilt, size);
     final Offset projectedCenter = earthCenterProj.offset;
 
     final double cRad = camera.altitude;

@@ -1,82 +1,118 @@
-# Implementation Plan - Optical Axis Projection Fix and Visual Regression Tests
+# Implementation Plan - Optical Axis Projection, Rotation Fixes, and Golden Tests
 
-This plan details the changes to create a visual regression test suite and fix the optical axis projection tilt/pitch rotation signs.
+This plan details the fixes for the optical axis projection tilt/pitch, ECEF double-elevation fallback, heading rotation matrix, sphere shader gradient alignment, and the regression/golden test updates.
 
 ## Target Files & Proposed Changes
 
 ### 1. `app_flutter/lib/features/topology/scene_3d_viewport.dart`
-- In `project` method (around line 1268-1269):
-  Replace:
+- **Fix 1: ECEF Fallback (No internal double-elevation)**:
+  In `project` method (lines 1177-1199), replace the ECEF calculation block:
   ```dart
-  final double y_cam = y1 * cosA - z1 * sinA;
-  final double z_cam = y1 * sinA + z1 * cosA;
+    final CesiumEngine? engine = CesiumEngine.instance;
+    final double radLng = -rotationY;
+    final double radLat = -tilt;
+
+    final double R = 6378137.0;
+
+    double px = 0.0;
+    double py = 0.0;
+    double pz = 0.0;
+
+    if (engine != null && engine.isReady) {
+      final ecef = engine.cartographicToEcef(lat * 180.0 / math.pi, lng * 180.0 / math.pi, height - R);
+      if (ecef != null) {
+        final (x, y, z) = ecef;
+        px = x;
+        py = y;
+        pz = z;
+      }
+    } else {
+      px = height * math.cos(lat) * math.cos(lng);
+      py = height * math.cos(lat) * math.sin(lng);
+      pz = height * math.sin(lat);
+    }
+  ```
+  with WGS84/geocentric fallback directly (since elevation is already added in `finalHeight` computation and passed as `height` parameter):
+  ```dart
+    final double radLng = -rotationY;
+    final double radLat = -tilt;
+
+    final double R = 6378137.0;
+
+    final double px = height * math.cos(lat) * math.cos(lng);
+    final double py = height * math.cos(lat) * math.sin(lng);
+    final double pz = height * math.sin(lat);
+  ```
+
+- **Fix 2: Correct heading rotation matrix** (both in `project` and `_getHorizonPath` methods):
+  Replace heading rotation matrix in `project` (lines 1265-1266):
+  ```dart
+    final double x1 = x_enu * cosH + y_enu * sinH;
+    final double y1 = -x_enu * sinH + y_enu * cosH;
   ```
   with:
   ```dart
-  final double y_cam = y1 * cosA + z1 * sinA;
-  final double z_cam = -y1 * sinA + z1 * cosA;
+    final double x1 = x_enu * cosH - y_enu * sinH;
+    final double y1 = x_enu * sinH + y_enu * cosH;
   ```
-- In `_getHorizonPath` method (around line 1380-1381):
-  Replace:
+  Replace heading rotation matrix in `_getHorizonPath` (lines 1377-1378):
   ```dart
-  final double y_cam = y1 * cosA - z1 * sinA;
-  final double z_cam = y1 * sinA + z1 * cosA;
+      final double x1 = x_enu * cosH + y_enu * sinH;
+      final double y1 = -x_enu * sinH + y_enu * cosH;
   ```
   with:
   ```dart
-  final double y_cam = y1 * cosA + z1 * sinA;
-  final double z_cam = -y1 * sinA + z1 * cosA;
+      final double x1 = x_enu * cosH - y_enu * sinH;
+      final double y1 = x_enu * sinH + y_enu * cosH;
+  ```
+
+- **Fix 3: Correct pitch rotation signs** (already implemented local-side in `project` and `_getHorizonPath`):
+  Ensure pitch rotation in `project` (lines 1270-1271) and `_getHorizonPath` (lines 1382-1383) uses:
+  ```dart
+    final double y_cam = y1 * cosA + z1 * sinA;
+    final double z_cam = -y1 * sinA + z1 * cosA;
+  ```
+
+- **Fix 4: Align sphere shader gradient**:
+  In `paint` method (around line 1421), replace the stationary center projection:
+  ```dart
+    final ProjectedPoint earthCenterProj = project(0.0, 0.0, 0.0, center, 0.0, 0.0, size);
+  ```
+  with:
+  ```dart
+    final ProjectedPoint earthCenterProj = project(0.0, 0.0, 0.0, center, rotationAngle, tilt, size);
+  ```
+
+- **Testing Utility**:
+  Add public helper `getEcefCoordinatesForTesting` to `Scene3DViewportPainter` so the new test case can verify intermediate ECEF values:
+  ```dart
+  (double, double, double) getEcefCoordinatesForTesting(double lat, double lng, double height) {
+    final double px = height * math.cos(lat) * math.cos(lng);
+    final double py = height * math.cos(lat) * math.sin(lng);
+    final double pz = height * math.sin(lat);
+    return (px, py, pz);
+  }
   ```
 
 ### 2. `app_flutter/test/topology/scene_3d_viewport_golden_test.dart`
-- Create this new visual regression test file with three test cases:
-  1. **Visual Test 1 - Stars and Sphere View**
-     - Camera latitude=0.0, longitude=0.0, altitude=20000000.0, heading=0, pitch=-90, roll=0.
-     - Empty TopologyData nodes.
-     - Settle/pump, assert match to `goldens/stars_and_sphere.png`.
-  2. **Visual Test 2 - Exaggerated Node Elevation Alignment**
-     - Camera latitude=35.3606, longitude=138.7274, altitude=1000.0, heading=0, pitch=-45, roll=0.
-     - Node at Mt. Fuji (138.7274, 35.3606) with alt=0.0.
-     - Settle/pump, assert match to `goldens/exaggerated_fuji_node.png`.
-  3. **Visual Test 3 - Forward/Backward Projection Inversion Culling**
-     - Camera latitude=35.441924, longitude=138.848037, altitude=90635.83, heading=56.65, pitch=-19.79, roll=0.
-     - Node 1: Nagoya-OPT-Core (136.90, 35.18, 0.0) - Southwest (behind camera, should be culled).
-     - Node 2: Tokyo-OPT-Core (140.00, 36.00, 0.0) - Northeast (in front of camera, should be rendered).
-     - First perform non-visual coordinate projection checks directly on the `Scene3DViewportPainter` using the buggy values to confirm the inversion bug (Nagoya projected, Tokyo culled).
-     - Assert visual identity matching `goldens/correct_view_culling.png`.
-
-### 3. Golden Images in `app_flutter/test/topology/goldens/`
-- `stars_and_sphere.png`
-- `exaggerated_fuji_node.png`
-- `correct_view_culling.png`
-
-## Optimization Changes
-
-### 1. `app_flutter/lib/features/topology/scene_3d_viewport.dart`
-- In `Scene3DViewportPainter` class:
-  - Add a static cache map for node elevations:
-    `static final Map<String, double> _nodeElevationCache = {};`
-  - In `paint` method:
-    - Inside the node project loop (around lines 1812 and 1825), replace:
-      ```dart
-      final double terrainElev = getElevation(latDeg, currentLng * 180.0 / math.pi);
-      ```
-      with:
-      ```dart
-      final String cacheKey = '$id-$verticalExaggeration-$elevationActive';
-      final double terrainElev = _nodeElevationCache.putIfAbsent(cacheKey, () => getElevation(latDeg, lngDeg));
-      ```
+- In `'Visual Test 3 - Forward/Backward Projection Inversion Culling'`, change the culling assertions to represent the correct physical view (Nagoya Southwest/behind is culled, Tokyo Northeast/in front is projected):
+  Replace:
+  ```dart
+  expect(nagoyaProj.z, greaterThan(0.0));
+  expect(tokyoProj.z, lessThan(0.0));
+  ```
+  with:
+  ```dart
+  expect(nagoyaProj.z, lessThan(0.0));
+  expect(tokyoProj.z, greaterThan(0.0));
+  ```
+- Add `'Visual Test 4 - Double Elevation Verification'` checking that when projecting a node at (135.0, 35.0, 6378137.0 + 800.0) with `elevationActive = true`, its computed ECEF vector magnitude exactly equals `6378137.0 + 800.0` (not double-added).
 
 ## Verification Plan
-1. Run the test suite on the buggy code to confirm the non-visual check fails:
-   `flutter test test/topology/scene_3d_viewport_golden_test.dart`
-2. Apply the mathematical fix in `scene_3d_viewport.dart`.
-3. Generate the corrected golden images:
+1. Modify the Golden Test File (`scene_3d_viewport_golden_test.dart`) to apply the new assertions and add the new test case.
+2. Run target test: `flutter test test/topology/scene_3d_viewport_golden_test.dart` to verify that the tests fail under the buggy code (failure detection loop).
+3. Surgically modify `scene_3d_viewport.dart` to apply Fixes 1, 2, and 4, and add the helper method.
+4. Regenerate golden visual baselines by running:
    `flutter test --update-goldens test/topology/scene_3d_viewport_golden_test.dart`
-4. Run the node elevation optimization benchmark to ensure performance matches instructions (< 22ms average frame render time):
-   `flutter test test/features/topology/globe_rendering_benchmark_test.dart`
-5. Run the entire test suite to ensure all unit and visual tests pass:
-   `flutter test`
-6. Verify `git diff` to make sure changes are clean and correct.
-7. Commit changes and push to origin tracking branch.
-
+5. Run the entire test suite `flutter test` to ensure all 213 unit and visual tests pass successfully.
+6. Commit all modified files and new golden PNG files, and push changes to origin tracking branch.

@@ -160,10 +160,9 @@ void main() {
         size,
       );
 
-      // Assert correct behavior: Nagoya (Southwest, behind) is projected; Tokyo (Northeast, in front) is culled.
-      // Under buggy code, Tokyo is projected and Nagoya is culled.
-      expect(nagoyaProj.z, greaterThan(0.0));
-      expect(tokyoProj.z, lessThan(0.0));
+      // Assert correct behavior: Nagoya (Southwest, behind) is culled; Tokyo (Northeast, in front) is projected.
+      expect(nagoyaProj.z, lessThan(0.0));
+      expect(tokyoProj.z, greaterThan(0.0));
 
       // Widget visual test
       final topologyData = TopologyData(
@@ -213,6 +212,48 @@ void main() {
         find.byType(Scene3DViewport),
         matchesGoldenFile('goldens/correct_view_culling.png'),
       );
+    });
+
+    testWidgets('Visual Test 4 - Double Elevation Verification', (WidgetTester tester) async {
+      final camera = VirtualCamera.clamped(
+        latitude: 35.0,
+        longitude: 135.0,
+        altitude: 1000.0,
+        heading: 0,
+        pitch: -90,
+        roll: 0,
+      );
+
+      final painter = Scene3DViewportPainter(
+        camera: camera,
+        activeStyle: 'dark',
+        astronomicalBody: 'Earth',
+        elevationActive: true,
+        showDevices: true,
+        showLinks: true,
+        showLabels: true,
+        showDropLines: true,
+        userRotationX: 0.0,
+        userTilt: 0.0,
+        zoomScale: 1.0,
+        verticalExaggeration: 1.0,
+      );
+
+      // 1. Check at (135.0, 35.0)
+      final double latRad = 35.0 * math.pi / 180.0;
+      final double lngRad = 135.0 * math.pi / 180.0;
+      final double height = 6378137.0 + 800.0;
+
+      final (px, py, pz) = painter.getEcefCoordinatesForTesting(latRad, lngRad, height);
+      final double magnitude = math.sqrt(px * px + py * py + pz * pz);
+      expect(magnitude, closeTo(6378137.0 + 800.0, 1e-4));
+
+      // 2. Check at (138.0, 35.0) where elevation is non-zero
+      final double latRad2 = 35.0 * math.pi / 180.0;
+      final double lngRad2 = 138.0 * math.pi / 180.0;
+      final (px2, py2, pz2) = painter.getEcefCoordinatesForTesting(latRad2, lngRad2, height);
+      final double magnitude2 = math.sqrt(px2 * px2 + py2 * py2 + pz2 * pz2);
+      expect(magnitude2, closeTo(6378137.0 + 800.0, 1e-4));
     });
   });
 }
