@@ -18,7 +18,6 @@ add_subdirectory(${CESIUM_NATIVE_DIR} ${CMAKE_BINARY_DIR}/cesium-native)
 
 add_library(cesium_native_bridge SHARED
   src/bridge.cpp
-  src/camera_marshal.cpp
   src/tile_data_marshal.cpp
   src/error_propagator.cpp
 )
