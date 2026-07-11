@@ -1,7 +1,9 @@
 import 'dart:math' as math;
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:app_flutter/domain/cesium_3d/virtual_camera.dart';
+import 'package:app_flutter/domain/cesium_3d/projected_point.dart';
 import 'package:app_flutter/features/topology/scene_3d_viewport.dart';
 import 'package:app_flutter/features/topology/topology_map.dart';
 
@@ -283,5 +285,193 @@ void main() {
       final double magnitude2 = math.sqrt(px2 * px2 + py2 * py2 + pz2 * pz2);
       expect(magnitude2, closeTo(6378137.0 + 800.0, 1e-4));
     });
+
+    testWidgets('Visual Test 5 - Correct Ground, Tower, and Satellite Altitude Projection', (WidgetTester tester) async {
+      final camera = VirtualCamera.clamped(
+        latitude: 35.18,
+        longitude: 136.90,
+        altitude: 20000000.0,
+        heading: 0,
+        pitch: -90,
+        roll: 0,
+      );
+
+      final topologyData = TopologyData(
+        coordinateMapping: const {},
+        nodes: [
+          TopologyNode(
+            id: 'Nagoya',
+            label: 'Nagoya',
+            position: const TopologyNodePosition(
+              dim0: 136.90,
+              dim1: 35.18,
+              dim2: 0.0,
+              timeIndex: 0,
+              vector: [],
+            ),
+            status: 'Active',
+            rawProperties: const {'type': 'ground'},
+          ),
+          TopologyNode(
+            id: 'Nagoya-Tower',
+            label: 'Nagoya-Tower',
+            position: const TopologyNodePosition(
+              dim0: 136.90,
+              dim1: 35.18,
+              dim2: 100.0,
+              timeIndex: 0,
+              vector: [],
+            ),
+            status: 'Active',
+            rawProperties: const {'type': 'ground'},
+          ),
+          TopologyNode(
+            id: 'Satellite',
+            label: 'Satellite',
+            position: const TopologyNodePosition(
+              dim0: 0.0,
+              dim1: 0.0,
+              dim2: 1000000.0,
+              timeIndex: 0,
+              vector: [],
+            ),
+            status: 'Active',
+            rawProperties: const {'type': 'space'},
+          ),
+        ],
+        links: const [],
+      );
+
+      final painter = _TestViewportPainter(
+        camera: camera,
+        elevationActive: true,
+        verticalExaggeration: 10.0,
+        topologyData: topologyData,
+      );
+
+      final canvas = _FakeCanvas();
+      painter.paint(canvas, const Size(800, 600));
+
+      // Assert geocentric heights
+      expect(painter.capturedHeights['nagoya_group'], isNotNull);
+      expect(painter.capturedHeights['nagoya_group']!.length, equals(2));
+      
+      final double elevation = painter.getElevation(35.18, 136.90);
+      final double expectedNagoyaHeight = 6378137.0 + elevation * 10.0;
+      final double expectedTowerHeight = 6378137.0 + elevation * 10.0 + 100.0;
+      
+      expect(painter.capturedHeights['nagoya_group']![0], closeTo(expectedNagoyaHeight, 1e-4));
+      expect(painter.capturedHeights['nagoya_group']![1], closeTo(expectedTowerHeight, 1e-4));
+      
+      expect(painter.capturedHeights['satellite'], isNotNull);
+      expect(painter.capturedHeights['satellite']!.any((h) => (h - (6378137.0 + 1000000.0)).abs() < 1e-4), isTrue);
+
+      // Verify Nagoya is classified as ground when rendering
+      final double rotationAngle = - (camera.longitude * math.pi / 180.0);
+      final double tilt = - (camera.latitude * math.pi / 180.0);
+      const Size size = Size(800, 600);
+      final Offset center = Offset(size.width * 0.45, size.height * 0.5);
+      final double currentLng = NagoyaNodeLngRad + rotationAngle * 0.0; // speed = 0.0
+      final nagoyaProj = painter.project(
+        NagoyaNodeLatRad,
+        currentLng,
+        expectedNagoyaHeight,
+        center,
+        rotationAngle,
+        tilt,
+        size,
+      );
+
+      final nagoyaOffset = nagoyaProj.offset;
+      final bool hasUnderwaterCircle = canvas.circles.any((c) => (c.$1 - nagoyaOffset).distance < 1e-3 && (c.$2 - 7.5).abs() < 1e-3);
+      expect(hasUnderwaterCircle, isFalse, reason: 'Nagoya should not be classified/drawn as underwater');
+
+      final bool hasGroundPoint = canvas.points.any((pts) => pts.any((p) => (p - nagoyaOffset).distance < 1e-3));
+      expect(hasGroundPoint, isTrue, reason: 'Nagoya should be classified/drawn as a ground node');
+    });
   });
+}
+
+const double NagoyaNodeLatRad = 35.18 * math.pi / 180.0;
+const double NagoyaNodeLngRad = 136.90 * math.pi / 180.0;
+
+class _FakeCanvas extends Fake implements Canvas {
+  final List<(Offset, double)> circles = [];
+  final List<List<Offset>> points = [];
+
+  @override
+  void drawCircle(Offset center, double radius, Paint paint) {
+    circles.add((center, radius));
+  }
+
+  @override
+  void drawPoints(PointMode pointMode, List<Offset> pointsList, Paint paint) {
+    points.add(List.from(pointsList));
+  }
+
+  @override
+  void drawParagraph(Paragraph paragraph, Offset offset) {}
+
+  @override
+  void drawPath(Path path, Paint paint) {}
+
+  @override
+  void drawLine(Offset p1, Offset p2, Paint paint) {}
+
+  @override
+  void drawRRect(RRect rrect, Paint paint) {}
+
+  @override
+  void save() {}
+
+  @override
+  void translate(double dx, double dy) {}
+
+  @override
+  void rotate(double radians) {}
+
+  @override
+  void restore() {}
+}
+
+class _TestViewportPainter extends Scene3DViewportPainter {
+  final Map<String, List<double>> capturedHeights = {};
+
+  _TestViewportPainter({
+    required super.camera,
+    required super.elevationActive,
+    required super.verticalExaggeration,
+    super.topologyData,
+  }) : super(
+          activeStyle: 'dark',
+          astronomicalBody: 'Earth',
+          showDevices: true,
+          showLinks: true,
+          showLabels: true,
+          showDropLines: true,
+          userRotationX: 0.0,
+          userTilt: 0.0,
+          zoomScale: 1.0,
+        );
+
+  @override
+  ProjectedPoint project(
+    double lat,
+    double lng,
+    double height,
+    Offset center,
+    double rotationY,
+    double tilt,
+    Size size,
+  ) {
+    final double latDeg = lat * 180.0 / math.pi;
+    final double lngDeg = lng * 180.0 / math.pi;
+
+    if ((latDeg - 35.18).abs() < 1e-3 && (lngDeg - 136.90).abs() < 1e-3) {
+      capturedHeights.putIfAbsent('nagoya_group', () => []).add(height);
+    } else if (latDeg.abs() < 1e-3 && lngDeg.abs() < 1e-3) {
+      capturedHeights.putIfAbsent('satellite', () => []).add(height);
+    }
+    return super.project(lat, lng, height, center, rotationY, tilt, size);
+  }
 }

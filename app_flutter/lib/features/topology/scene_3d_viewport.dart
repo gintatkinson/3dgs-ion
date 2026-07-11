@@ -1756,7 +1756,7 @@ class Scene3DViewportPainter extends CustomPainter {
       
       final String nodeType = (node.rawProperties['type'] as String?)?.toUpperCase() ?? '';
       final bool isSatellite = nodeType == 'SATELLITE' || id.toLowerCase().contains('sat') || alt > 100000.0;
-      final bool isUnderwater = alt <= 10.0;
+      final bool isUnderwater = nodeType == 'UNDERWATER' || (nodeType.isEmpty && alt < 0.0) || id.toLowerCase().contains('underwater');
       
       double orbitHeight;
       String type;
@@ -1807,7 +1807,7 @@ class Scene3DViewportPainter extends CustomPainter {
         if (elevationActive) {
           final String cacheKey = id + keySuffix;
           final double terrainElev = _nodeElevationCache.putIfAbsent(cacheKey, () => getElevation(latDeg, lngDeg));
-          finalHeight = 6378137.0 + (terrainElev + alt) * verticalExaggeration;
+          finalHeight = 6378137.0 + terrainElev * verticalExaggeration + alt;
         } else {
           finalHeight = 6378137.0 + alt;
         }
