@@ -365,10 +365,10 @@ class GlobeTileRenderer {
 
           // Triangle 1: (i0, i1, i2)
           final bool anyBehind1 = zs[i0] <= -100.0 || zs[i1] <= -100.0 || zs[i2] <= -100.0;
-          final bool allCulled1 = zs[i0] < -1.5 && zs[i1] < -1.5 && zs[i2] < -1.5;
+          final bool allCulled1 = zs[i0] < -0.5 && zs[i1] < -0.5 && zs[i2] < -0.5;
           if (anyBehind1 || allCulled1) {
             // Discard
-          } else if (zs[i0] >= 0.0 || zs[i1] >= 0.0 || zs[i2] >= 0.0) {
+          } else {
             indices.add(i0);
             indices.add(i1);
             indices.add(i2);
@@ -376,10 +376,10 @@ class GlobeTileRenderer {
 
           // Triangle 2: (i1, i3, i2)
           final bool anyBehind2 = zs[i1] <= -100.0 || zs[i3] <= -100.0 || zs[i2] <= -100.0;
-          final bool allCulled2 = zs[i1] < -1.5 && zs[i3] < -1.5 && zs[i2] < -1.5;
+          final bool allCulled2 = zs[i1] < -0.5 && zs[i3] < -0.5 && zs[i2] < -0.5;
           if (anyBehind2 || allCulled2) {
             // Discard
-          } else if (zs[i1] >= 0.0 || zs[i3] >= 0.0 || zs[i2] >= 0.0) {
+          } else {
             indices.add(i1);
             indices.add(i3);
             indices.add(i2);
@@ -455,14 +455,22 @@ class GlobeTileRenderer {
         final int i3 = i2 + 1;
 
         // Triangle 1: (i0, i1, i2)
-        if (zs[i0] >= 0.0 || zs[i1] >= 0.0 || zs[i2] >= 0.0) {
+        final bool anyBehind1 = zs[i0] <= -100.0 || zs[i1] <= -100.0 || zs[i2] <= -100.0;
+        final bool allCulled1 = zs[i0] < -0.5 && zs[i1] < -0.5 && zs[i2] < -0.5;
+        if (anyBehind1 || allCulled1) {
+          // Discard
+        } else {
           indices.add(i0);
           indices.add(i1);
           indices.add(i2);
         }
 
         // Triangle 2: (i1, i3, i2)
-        if (zs[i1] >= 0.0 || zs[i3] >= 0.0 || zs[i2] >= 0.0) {
+        final bool anyBehind2 = zs[i1] <= -100.0 || zs[i3] <= -100.0 || zs[i2] <= -100.0;
+        final bool allCulled2 = zs[i1] < -0.5 && zs[i3] < -0.5 && zs[i2] < -0.5;
+        if (anyBehind2 || allCulled2) {
+          // Discard
+        } else {
           indices.add(i1);
           indices.add(i3);
           indices.add(i2);

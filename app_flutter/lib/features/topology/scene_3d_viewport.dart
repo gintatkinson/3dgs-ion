@@ -81,24 +81,15 @@ class Scene3DViewportState extends State<Scene3DViewport> {
     final double latRad = latitude * math.pi / 180.0;
     final double lngRad = longitude * math.pi / 180.0;
 
-    final String upperType = nodeType.toUpperCase();
-    final bool isSpace = upperType == 'SPACE' ||
-        upperType == 'SATELLITE' ||
-        upperType == 'AIR' ||
-        upperType == 'METEOR' ||
-        upperType == 'CLOUD' ||
-        upperType == 'UOF' ||
-        upperType == 'UFO' ||
-        altitude > 100000.0;
-    final bool isUnderwater = upperType == 'UNDERWATER' || (upperType.isEmpty && altitude < 0.0);
-    
+    final String heightRef = nodeType.toUpperCase();
     final String type;
-    if (isSpace) {
-      type = 'space';
-    } else if (isUnderwater) {
-      type = 'underwater';
-    } else {
+    if (heightRef == 'RELATIVE_TO_GROUND' || heightRef == 'CLAMP_TO_GROUND') {
       type = 'ground';
+    } else if (heightRef == 'ABSOLUTE') {
+      type = 'space';
+    } else {
+      // Geometric fallback
+      type = (altitude < 50000.0) ? 'ground' : 'space';
     }
 
     final double finalHeight;
@@ -139,7 +130,6 @@ class Scene3DViewportState extends State<Scene3DViewport> {
       baseRotation,
       baseTilt,
       size,
-      clampToHorizon: false,
     );
 
     return projected.offset;
@@ -1262,24 +1252,27 @@ class Scene3DViewportPainter extends CustomPainter {
     }
 
     if (isCulled && clampToHorizon) {
-      final double r2_over_d2 = (R * R) / d2;
-      final double parX = r2_over_d2 * cx;
-      final double parY = r2_over_d2 * cy;
-      final double parZ = r2_over_d2 * cz;
+      final double h2 = height * height;
+      if (d2 > h2) {
+        final double r2_over_d2 = h2 / d2;
+        final double parX = r2_over_d2 * cx;
+        final double parY = r2_over_d2 * cy;
+        final double parZ = r2_over_d2 * cz;
 
-      final double dotPC = px * cx + py * cy + pz * cz;
-      final double dot_over_d2 = dotPC / d2;
-      final double perpX = px - dot_over_d2 * cx;
-      final double perpY = py - dot_over_d2 * cy;
-      final double perpZ = pz - dot_over_d2 * cz;
+        final double dotPC = px * cx + py * cy + pz * cz;
+        final double dot_over_d2 = dotPC / d2;
+        final double perpX = px - dot_over_d2 * cx;
+        final double perpY = py - dot_over_d2 * cy;
+        final double perpZ = pz - dot_over_d2 * cz;
 
-      final double perpLen = math.sqrt(perpX * perpX + perpY * perpY + perpZ * perpZ);
-      if (perpLen > 0.0) {
-        final double rHorizon = R * math.sqrt(1.0 - (R * R) / d2);
-        final double scale = rHorizon / perpLen;
-        px = parX + perpX * scale;
-        py = parY + perpY * scale;
-        pz = parZ + perpZ * scale;
+        final double perpLen = math.sqrt(perpX * perpX + perpY * perpY + perpZ * perpZ);
+        if (perpLen > 0.0) {
+          final double rHorizon = height * math.sqrt(1.0 - h2 / d2);
+          final double scale = rHorizon / perpLen;
+          px = parX + perpX * scale;
+          py = parY + perpY * scale;
+          pz = parZ + perpZ * scale;
+        }
       }
     }
 
@@ -1374,6 +1367,83 @@ class Scene3DViewportPainter extends CustomPainter {
     final double px = height * math.cos(lat) * math.cos(lng);
     final double py = height * math.cos(lat) * math.sin(lng);
     final double pz = height * math.sin(lat);
+    return (px, py, pz);
+  }
+
+  (double, double, double) getSnappedEcefCoordinatesForTesting(
+    double lat,
+    double lng,
+    double height,
+    double cameraAltitude,
+  ) {
+    final double R = 6378137.0;
+    final double radLng = 0.0;
+    final double radLat = 0.0;
+
+    double px = height * math.cos(lat) * math.cos(lng);
+    double py = height * math.cos(lat) * math.sin(lng);
+    double pz = height * math.sin(lat);
+
+    final double cRad = cameraAltitude;
+    final double cx = cRad * math.cos(radLat) * math.cos(radLng);
+    final double cy = cRad * math.cos(radLat) * math.sin(radLng);
+    final double cz = cRad * math.sin(radLat);
+
+    final double d2 = cRad * cRad;
+    final double r2 = R * R;
+
+    // cull check
+    bool isCulled = false;
+    {
+      final double cullHeight = math.max(height, R);
+      final double pxCull = cullHeight * math.cos(lat) * math.cos(lng);
+      final double pyCull = cullHeight * math.cos(lat) * math.sin(lng);
+      final double pzCull = cullHeight * math.sin(lat);
+
+      final double rx = pxCull - cx;
+      final double ry = pyCull - cy;
+      final double rz = pzCull - cz;
+      final double dCP2 = rx * rx + ry * ry + rz * rz;
+      final double dotPC = pxCull * cx + pyCull * cy + pzCull * cz;
+
+      if (dotPC < r2) {
+        final double tMin = (d2 - dotPC) / dCP2;
+        if (tMin >= 0.0 && tMin <= 1.0) {
+          final double minDistanceSq = d2 - (d2 - dotPC) * (d2 - dotPC) / dCP2;
+          if (minDistanceSq < r2) {
+            isCulled = true;
+          }
+        }
+      }
+    }
+    if (height < R && cRad > R) {
+      isCulled = true;
+    }
+
+    if (isCulled) {
+      final double h2 = height * height;
+      if (d2 > h2) {
+        final double r2_over_d2 = h2 / d2;
+        final double parX = r2_over_d2 * cx;
+        final double parY = r2_over_d2 * cy;
+        final double parZ = r2_over_d2 * cz;
+
+        final double dotPC = px * cx + py * cy + pz * cz;
+        final double dot_over_d2 = dotPC / d2;
+        final double perpX = px - dot_over_d2 * cx;
+        final double perpY = py - dot_over_d2 * cy;
+        final double perpZ = pz - dot_over_d2 * cz;
+
+        final double perpLen = math.sqrt(perpX * perpX + perpY * perpY + perpZ * perpZ);
+        if (perpLen > 0.0) {
+          final double rHorizon = height * math.sqrt(1.0 - h2 / d2);
+          final double scale = rHorizon / perpLen;
+          px = parX + perpX * scale;
+          py = parY + perpY * scale;
+          pz = parZ + perpZ * scale;
+        }
+      }
+    }
     return (px, py, pz);
   }
 
@@ -1723,7 +1793,6 @@ class Scene3DViewportPainter extends CustomPainter {
             rotationAngle,
             tilt,
             size,
-            clampToHorizon: false,
           );
         },
       );
@@ -1822,34 +1891,20 @@ class Scene3DViewportPainter extends CustomPainter {
       final double lat = _rad(latDeg);
       final double baseLng = _rad(lngDeg);
       
-      final String nodeType = (node.rawProperties['type'] as String?)?.toUpperCase() ?? '';
-      final bool isSpace = nodeType == 'SPACE' ||
-          nodeType == 'SATELLITE' ||
-          nodeType == 'AIR' ||
-          nodeType == 'METEOR' ||
-          nodeType == 'CLOUD' ||
-          nodeType == 'UOF' ||
-          nodeType == 'UFO' ||
-          id.toLowerCase().contains('sat') ||
-          alt > 100000.0;
-      final bool isUnderwater = nodeType == 'UNDERWATER' || (nodeType.isEmpty && alt < 0.0) || id.toLowerCase().contains('underwater');
-      
-      double orbitHeight;
-      String type;
-      double speed = 0.0;
-
-      if (isSpace) {
-        type = 'space';
-        orbitHeight = 6378137.0 + alt;
-        // Deterministic orbital speed is 0.0 for geostationary constellation
-        speed = 0.0;
-      } else if (isUnderwater) {
-        type = 'underwater';
-        orbitHeight = 6378137.0 + alt;
-      } else {
+      final String heightRef = (node.rawProperties['heightReference'] ?? 
+                                node.rawProperties['height_reference'] ?? '').toString().toUpperCase();
+      final String type;
+      if (heightRef == 'RELATIVE_TO_GROUND' || heightRef == 'CLAMP_TO_GROUND') {
         type = 'ground';
-        orbitHeight = 6378137.0 + alt;
+      } else if (heightRef == 'ABSOLUTE') {
+        type = 'space';
+      } else {
+        // Geometric fallback
+        type = (alt < 50000.0) ? 'ground' : 'space';
       }
+
+      final double orbitHeight = 6378137.0 + alt;
+      final double speed = 0.0;
 
       final double currentLng = baseLng + rotationAngle * speed;
 
@@ -1860,7 +1915,7 @@ class Scene3DViewportPainter extends CustomPainter {
         const int steps = 60;
         for (int step = 0; step <= steps; step++) {
           final double stepLng = baseLng + (step / steps) * 2 * math.pi;
-          final stepProj = project(lat, stepLng, orbitHeight, center, rotationAngle, tilt, size, clampToHorizon: false);
+          final stepProj = project(lat, stepLng, orbitHeight, center, rotationAngle, tilt, size);
           
           if (stepProj.z >= 0.0) {
             if (!orbitStarted) {
@@ -1891,7 +1946,7 @@ class Scene3DViewportPainter extends CustomPainter {
           finalHeight = 6378137.0 + alt;
         }
       }
-      final proj = project(lat, currentLng, finalHeight, center, rotationAngle, tilt, size, clampToHorizon: false);
+      final proj = project(lat, currentLng, finalHeight, center, rotationAngle, tilt, size);
       
       if (proj.z >= 0) {
         allProjectedNodes[id] = proj;
@@ -1904,7 +1959,7 @@ class Scene3DViewportPainter extends CustomPainter {
           );
           final double terrainElev = _nodeElevationCache.putIfAbsent(cacheKey, () => getElevation(latDeg, lngDeg));
           final double surfaceHeight = 6378137.0 + terrainElev * verticalExaggeration;
-          final surfaceProj = project(lat, currentLng, surfaceHeight, center, rotationAngle, tilt, size, clampToHorizon: false);
+          final surfaceProj = project(lat, currentLng, surfaceHeight, center, rotationAngle, tilt, size);
 
           const int dashes = 10;
           for (int d = 0; d < dashes; d++) {

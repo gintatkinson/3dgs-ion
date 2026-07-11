@@ -678,6 +678,127 @@ void main() {
       expect(painter.capturedHeights['meteor_group'], isNotNull);
       expect(painter.capturedHeights['meteor_group']![0], closeTo(6378137.0 + 50000.0, 1e-4));
     });
+
+    testWidgets('Test Case 6 - Dynamic Horizon Snapping Verification', (WidgetTester tester) async {
+      final camera = VirtualCamera.clamped(
+        latitude: 0.0,
+        longitude: 0.0,
+        altitude: 10000000.0,
+        heading: 0,
+        pitch: -90,
+        roll: 0,
+      );
+
+      final painter = Scene3DViewportPainter(
+        camera: camera,
+        activeStyle: 'dark',
+        astronomicalBody: 'Earth',
+        elevationActive: false,
+        showDevices: true,
+        showLinks: true,
+        showLabels: true,
+        showDropLines: true,
+        userRotationX: 0.0,
+        userTilt: 0.0,
+        zoomScale: 1.0,
+        verticalExaggeration: 1.0,
+      );
+
+      final double lat = 0.0;
+      final double lng = 2.0; // Off-axis culled longitude to ensure non-zero perpendicular component
+      final double H = 6378137.0 + 200000.0; // Point height
+      final double d = 10000000.0; // Camera altitude
+
+      final (px, py, pz) = painter.getSnappedEcefCoordinatesForTesting(lat, lng, H, d);
+
+      // 1. Geocentric distance must be precisely H
+      final double geocentricDist = math.sqrt(px * px + py * py + pz * pz);
+      expect(geocentricDist, closeTo(H, 1e-4));
+
+      // 2. Snapped distance from the camera center line
+      final double h2 = H * H;
+      final double d2 = d * d;
+      final double r2_over_d2 = h2 / d2;
+      final double cx = d;
+      final double cy = 0.0;
+      final double cz = 0.0;
+      final double parX = r2_over_d2 * cx;
+      final double parY = r2_over_d2 * cy;
+      final double parZ = r2_over_d2 * cz;
+
+      final double dx = px - parX;
+      final double dy = py - parY;
+      final double dz = pz - parZ;
+      final double planeDist = math.sqrt(dx * dx + dy * dy + dz * dz);
+
+      final double expectedPlaneDist = H * math.sqrt(1.0 - h2 / d2);
+      expect(planeDist, closeTo(expectedPlaneDist, 1e-4));
+    });
+
+    testWidgets('Test Case 7 - Node Elevation Classification Fallback Defaulting', (WidgetTester tester) async {
+      final camera = VirtualCamera.clamped(
+        latitude: 35.3606,
+        longitude: 138.7274,
+        altitude: 1000.0,
+        heading: 0,
+        pitch: -90,
+        roll: 0,
+      );
+
+      final topologyData = TopologyData(
+        coordinateMapping: const {},
+        nodes: [
+          TopologyNode(
+            id: 'SpaceNode-1',
+            label: 'SpaceNode-1',
+            position: const TopologyNodePosition(
+              dim0: 138.7274,
+              dim1: 35.3606,
+              dim2: 50000.0, // alt >= 50000.0 -> space fallback
+              timeIndex: 0,
+              vector: [],
+            ),
+            status: 'Active',
+            rawProperties: const {},
+          ),
+          TopologyNode(
+            id: 'GroundNode-1',
+            label: 'GroundNode-1',
+            position: const TopologyNodePosition(
+              dim0: 138.7274,
+              dim1: 35.3606,
+              dim2: 1000.0, // alt < 50000.0 -> ground fallback
+              timeIndex: 0,
+              vector: [],
+            ),
+            status: 'Active',
+            rawProperties: const {},
+          ),
+        ],
+        links: const [],
+      );
+
+      final painter = _TestViewportPainter(
+        camera: camera,
+        elevationActive: true,
+        verticalExaggeration: 10.0,
+        topologyData: topologyData,
+      );
+
+      final canvas = _FakeCanvas();
+      painter.paint(canvas, const Size(800, 600));
+
+      expect(painter.capturedHeights['fuji_group'], isNotNull);
+      final heights = painter.capturedHeights['fuji_group']!;
+      expect(heights.length, equals(3));
+
+      final double expectedSpaceHeight = 6378137.0 + 50000.0;
+      final double terrainElev = painter.getElevation(35.3606, 138.7274);
+      final double expectedGroundHeight = 6378137.0 + terrainElev * 10.0 + 1000.0;
+
+      expect(heights, contains(closeTo(expectedSpaceHeight, 1e-4)));
+      expect(heights, contains(closeTo(expectedGroundHeight, 1e-4)));
+    });
   });
 }
 
@@ -764,6 +885,11 @@ class _TestViewportPainter extends Scene3DViewportPainter {
     } else if ((latDeg - 35.3606).abs() < 1e-3 && (lngDeg - 138.7274).abs() < 1e-3 && height > 6378137.0 + 40000.0) {
       capturedHeights.putIfAbsent('meteor_group', () => []).add(height);
     }
+
+    if ((latDeg - 35.3606).abs() < 1e-3 && (lngDeg - 138.7274).abs() < 1e-3) {
+      capturedHeights.putIfAbsent('fuji_group', () => []).add(height);
+    }
+
     return super.project(lat, lng, height, center, rotationY, tilt, size, clampToHorizon: clampToHorizon);
   }
 }
