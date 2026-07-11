@@ -54,7 +54,12 @@ class Scene3DViewportState extends State<Scene3DViewport> {
   @visibleForTesting
   GlobeTileRenderer? get tileRenderer => _tileRenderer;
 
-  Offset getProjectedPosition(double latitude, double longitude) {
+  Offset getProjectedPosition(
+    double latitude,
+    double longitude, {
+    double altitude = 0.0,
+    String nodeType = '',
+  }) {
     final Size? size = context.size;
     if (size == null) return Offset.zero;
 
@@ -75,6 +80,38 @@ class Scene3DViewportState extends State<Scene3DViewport> {
 
     final double latRad = latitude * math.pi / 180.0;
     final double lngRad = longitude * math.pi / 180.0;
+
+    final String upperType = nodeType.toUpperCase();
+    final bool isSpace = upperType == 'SPACE' ||
+        upperType == 'SATELLITE' ||
+        upperType == 'AIR' ||
+        upperType == 'METEOR' ||
+        upperType == 'CLOUD' ||
+        upperType == 'UOF' ||
+        upperType == 'UFO' ||
+        altitude > 100000.0;
+    final bool isUnderwater = upperType == 'UNDERWATER' || (upperType.isEmpty && altitude < 0.0);
+    
+    final String type;
+    if (isSpace) {
+      type = 'space';
+    } else if (isUnderwater) {
+      type = 'underwater';
+    } else {
+      type = 'ground';
+    }
+
+    final double finalHeight;
+    if (type == 'space') {
+      finalHeight = 6378137.0 + altitude;
+    } else {
+      if (_elevationActive) {
+        final double terrainElev = Scene3DViewportPainter.getElevationStatic(latitude, longitude, _elevationActive);
+        finalHeight = 6378137.0 + terrainElev * widget.verticalExaggeration + altitude;
+      } else {
+        finalHeight = 6378137.0 + altitude;
+      }
+    }
 
     final painter = Scene3DViewportPainter(
       camera: camera,
@@ -97,11 +134,12 @@ class Scene3DViewportState extends State<Scene3DViewport> {
     final ProjectedPoint projected = painter.project(
       latRad,
       lngRad,
-      6378137.0,
+      finalHeight,
       center,
       baseRotation,
       baseTilt,
       size,
+      clampToHorizon: false,
     );
 
     return projected.offset;
@@ -1023,6 +1061,7 @@ class Scene3DViewportState extends State<Scene3DViewport> {
 
 class Scene3DViewportPainter extends CustomPainter {
   static final Map<String, double> _nodeElevationCache = {};
+  static final Map<String, String> _cacheKeyStringCache = {};
 
   final VirtualCamera camera;
   final String activeStyle;
@@ -1172,8 +1211,9 @@ class Scene3DViewportPainter extends CustomPainter {
     Offset center,
     double rotationY,
     double tilt,
-    Size size,
-  ) {
+    Size size, {
+    bool clampToHorizon = true,
+  }) {
     final CesiumEngine? engine = CesiumEngine.instance;
     final double radLng = -rotationY;
     final double radLat = -tilt;
@@ -1217,7 +1257,11 @@ class Scene3DViewportPainter extends CustomPainter {
       }
     }
 
-    if (isCulled) {
+    if (height < R && cRad > R) {
+      isCulled = true;
+    }
+
+    if (isCulled && clampToHorizon) {
       final double r2_over_d2 = (R * R) / d2;
       final double parX = r2_over_d2 * cx;
       final double parY = r2_over_d2 * cy;
@@ -1295,7 +1339,7 @@ class Scene3DViewportPainter extends CustomPainter {
     if (depth <= 0.0) {
       depthVal = -100.0;
     } else if (isCulled) {
-      depthVal = -1.0;
+      depthVal = clampToHorizon ? -1.0 : -2.0;
     } else {
       depthVal = depth;
     }
@@ -1679,6 +1723,7 @@ class Scene3DViewportPainter extends CustomPainter {
             rotationAngle,
             tilt,
             size,
+            clampToHorizon: false,
           );
         },
       );
@@ -1778,14 +1823,22 @@ class Scene3DViewportPainter extends CustomPainter {
       final double baseLng = _rad(lngDeg);
       
       final String nodeType = (node.rawProperties['type'] as String?)?.toUpperCase() ?? '';
-      final bool isSatellite = nodeType == 'SATELLITE' || id.toLowerCase().contains('sat') || alt > 100000.0;
+      final bool isSpace = nodeType == 'SPACE' ||
+          nodeType == 'SATELLITE' ||
+          nodeType == 'AIR' ||
+          nodeType == 'METEOR' ||
+          nodeType == 'CLOUD' ||
+          nodeType == 'UOF' ||
+          nodeType == 'UFO' ||
+          id.toLowerCase().contains('sat') ||
+          alt > 100000.0;
       final bool isUnderwater = nodeType == 'UNDERWATER' || (nodeType.isEmpty && alt < 0.0) || id.toLowerCase().contains('underwater');
       
       double orbitHeight;
       String type;
       double speed = 0.0;
 
-      if (isSatellite) {
+      if (isSpace) {
         type = 'space';
         orbitHeight = 6378137.0 + alt;
         // Deterministic orbital speed is 0.0 for geostationary constellation
@@ -1807,7 +1860,7 @@ class Scene3DViewportPainter extends CustomPainter {
         const int steps = 60;
         for (int step = 0; step <= steps; step++) {
           final double stepLng = baseLng + (step / steps) * 2 * math.pi;
-          final stepProj = project(lat, stepLng, orbitHeight, center, rotationAngle, tilt, size);
+          final stepProj = project(lat, stepLng, orbitHeight, center, rotationAngle, tilt, size, clampToHorizon: false);
           
           if (stepProj.z >= 0.0) {
             if (!orbitStarted) {
@@ -1828,24 +1881,30 @@ class Scene3DViewportPainter extends CustomPainter {
       double finalHeight = orbitHeight;
       if (type == 'ground' || type == 'underwater') {
         if (elevationActive) {
-          final String cacheKey = id + keySuffix;
+          final String cacheKey = _cacheKeyStringCache.putIfAbsent(
+            id,
+            () => '$id-${latDeg.toStringAsFixed(6)}-${lngDeg.toStringAsFixed(6)}-$astronomicalBody-$elevationActive',
+          );
           final double terrainElev = _nodeElevationCache.putIfAbsent(cacheKey, () => getElevation(latDeg, lngDeg));
           finalHeight = 6378137.0 + terrainElev * verticalExaggeration + alt;
         } else {
           finalHeight = 6378137.0 + alt;
         }
       }
-      final proj = project(lat, currentLng, finalHeight, center, rotationAngle, tilt, size);
+      final proj = project(lat, currentLng, finalHeight, center, rotationAngle, tilt, size, clampToHorizon: false);
       
       if (proj.z >= 0) {
         allProjectedNodes[id] = proj;
 
         // Draw vertical drop line from satellite to surface
         if (type == 'space' && showDropLines) {
-          final String cacheKey = id + keySuffix;
+          final String cacheKey = _cacheKeyStringCache.putIfAbsent(
+            id,
+            () => '$id-${latDeg.toStringAsFixed(6)}-${lngDeg.toStringAsFixed(6)}-$astronomicalBody-$elevationActive',
+          );
           final double terrainElev = _nodeElevationCache.putIfAbsent(cacheKey, () => getElevation(latDeg, lngDeg));
           final double surfaceHeight = 6378137.0 + terrainElev * verticalExaggeration;
-          final surfaceProj = project(lat, currentLng, surfaceHeight, center, rotationAngle, tilt, size);
+          final surfaceProj = project(lat, currentLng, surfaceHeight, center, rotationAngle, tilt, size, clampToHorizon: false);
 
           const int dashes = 10;
           for (int d = 0; d < dashes; d++) {
@@ -1976,6 +2035,12 @@ class Scene3DViewportPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant Scene3DViewportPainter oldDelegate) {
+    if (oldDelegate.elevationActive != elevationActive ||
+        oldDelegate.astronomicalBody != astronomicalBody ||
+        oldDelegate.verticalExaggeration != verticalExaggeration) {
+      _nodeElevationCache.clear();
+      _cacheKeyStringCache.clear();
+    }
     return oldDelegate.camera != camera ||
         oldDelegate.activeStyle != activeStyle ||
         oldDelegate.astronomicalBody != astronomicalBody ||
@@ -1988,7 +2053,8 @@ class Scene3DViewportPainter extends CustomPainter {
         oldDelegate.userTilt != userTilt ||
         oldDelegate.zoomScale != zoomScale ||
         oldDelegate.tileRenderer != tileRenderer ||
-        oldDelegate.imageryProvider != imageryProvider;
+        oldDelegate.imageryProvider != imageryProvider ||
+        oldDelegate.verticalExaggeration != verticalExaggeration;
   }
 }
 

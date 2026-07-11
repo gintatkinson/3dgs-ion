@@ -134,6 +134,8 @@ class TileFetcher {
     return urlFor(provider, z, x, y);
   }
 
+  static String? urlOverride;
+
   /// Fetches the tile image bytes for [provider] at zoom [z] and tile
   /// coordinates ([x], [y]).
   ///
@@ -152,7 +154,10 @@ class TileFetcher {
     if (cached != null) return cached;
 
     try {
-      final uri = Uri.parse(_urlFor(provider, z, x, y));
+      final String url = urlOverride != null
+          ? '$urlOverride/${provider.name}/$z/$x/$y.png'
+          : _urlFor(provider, z, x, y);
+      final uri = Uri.parse(url);
       final request = await _client.getUrl(uri);
       final response = await request.close();
       if (response.statusCode == 200) {

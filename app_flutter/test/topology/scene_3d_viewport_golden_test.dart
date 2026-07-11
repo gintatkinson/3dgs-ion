@@ -1,14 +1,49 @@
+import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:provider/provider.dart';
+import 'package:app_flutter/core/theme/theme_controller.dart';
+import 'package:app_flutter/core/theme/theme_service.dart';
 import 'package:app_flutter/domain/cesium_3d/virtual_camera.dart';
 import 'package:app_flutter/domain/cesium_3d/projected_point.dart';
+import 'package:app_flutter/domain/cesium_3d/tile_fetcher.dart';
 import 'package:app_flutter/features/topology/scene_3d_viewport.dart';
 import 'package:app_flutter/features/topology/topology_map.dart';
+import 'package:app_flutter/features/topology/topographical_view.dart';
 
 void main() {
   group('Scene3DViewport Golden Tests', () {
+    late HttpServer server;
+
+    setUp(() async {
+      server = await HttpServer.bind('localhost', 0);
+      TileFetcher.urlOverride = 'http://localhost:${server.port}';
+      server.listen((HttpRequest request) async {
+        try {
+          File file = File('test/topology/goldens/exaggerated_fuji_node.png');
+          if (!file.existsSync()) {
+            file = File('/Users/perkunas/jail/3dgs-ion/app_flutter/test/topology/goldens/exaggerated_fuji_node.png');
+          }
+          final bytes = await file.readAsBytes();
+          request.response
+            ..headers.contentType = ContentType('image', 'png')
+            ..statusCode = HttpStatus.ok;
+          request.response.add(bytes);
+        } catch (e) {
+          request.response.statusCode = HttpStatus.internalServerError;
+        } finally {
+          await request.response.close();
+        }
+      });
+    });
+
+    tearDown(() async {
+      TileFetcher.urlOverride = null;
+      await server.close(force: true);
+    });
+
     testWidgets('Visual Test 1 - Stars and Sphere View', (WidgetTester tester) async {
       tester.view.physicalSize = const Size(800, 600);
       tester.view.devicePixelRatio = 1.0;
@@ -390,6 +425,259 @@ void main() {
       final bool hasGroundPoint = canvas.points.any((pts) => pts.any((p) => (p - pointAOffset).distance < 1e-3));
       expect(hasGroundPoint, isTrue, reason: 'PointA should be classified/drawn as a ground node');
     });
+
+    testWidgets('Test Case 1 - Layout Stack Check', (WidgetTester tester) async {
+      final camera = VirtualCamera.clamped(
+        latitude: 35.18,
+        longitude: 136.90,
+        altitude: 20000000.0,
+        heading: 0.0,
+        pitch: -90.0,
+        roll: 0.0,
+      );
+
+      final topologyData = TopologyData(
+        coordinateMapping: const {},
+        nodes: const [],
+        links: const [],
+      );
+
+      await tester.pumpWidget(
+        ChangeNotifierProvider<ThemeController>(
+          create: (_) => ThemeController(_FakeThemeService()),
+          child: MaterialApp(
+            home: Scaffold(
+              body: TopographicalView(
+                currentView: 'GS-Tokyo',
+                onViewSelected: (_) {},
+                topologyData: topologyData,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // In 3D mode (default), Scene3DViewport should exist
+      expect(find.byType(Scene3DViewport), findsOneWidget);
+
+      // Verify no 2D Map controllers leak in the stack
+      expect(find.byKey(const ValueKey<String>('playPauseButton')), findsNothing);
+      expect(find.byKey(const ValueKey<String>('timeSlider')), findsNothing);
+      expect(find.byKey(const ValueKey<String>('speedDropdown')), findsNothing);
+    });
+
+    testWidgets('Test Case 2 - Warped Horizon Snapping', (WidgetTester tester) async {
+      final camera = VirtualCamera.clamped(
+        latitude: 0.0,
+        longitude: 0.0,
+        altitude: 10000000.0, // outside Earth
+        heading: 0.0,
+        pitch: -90.0,
+        roll: 0.0,
+      );
+      final painter = Scene3DViewportPainter(
+        camera: camera,
+        activeStyle: 'dark',
+        astronomicalBody: 'Earth',
+        elevationActive: false,
+        showDevices: true,
+        showLinks: true,
+        showLabels: true,
+        showDropLines: true,
+        userRotationX: 0.0,
+        userTilt: 0.0,
+        zoomScale: 1.0,
+        verticalExaggeration: 1.0,
+      );
+      const size = Size(800, 600);
+      final center = Offset(400, 300);
+      final double rotationAngle = 0.0;
+      final double tilt = 0.0;
+
+      final double lat = 0.0;
+      final double lng = math.pi; // back side (culled)
+      final double height = 6378137.0 + 1000.0;
+
+      final projClamped = painter.project(lat, lng, height, center, rotationAngle, tilt, size, clampToHorizon: true);
+      final projNatural = painter.project(lat, lng, height, center, rotationAngle, tilt, size, clampToHorizon: false);
+
+      // Verify that when clampToHorizon is false, we get different projected coordinates (natural coords, not snapped)
+      expect(projClamped.offset, isNot(equals(projNatural.offset)));
+      expect(projNatural.z, lessThan(0.0));
+    });
+
+    testWidgets('Test Case 3 - Subsurface Occlusion Culling', (WidgetTester tester) async {
+      final camera = VirtualCamera.clamped(
+        latitude: 0.0,
+        longitude: 0.0,
+        altitude: 6378137.0 + 100000.0, // camera outside Earth
+        heading: 0.0,
+        pitch: -90.0,
+        roll: 0.0,
+      );
+      final painter = Scene3DViewportPainter(
+        camera: camera,
+        activeStyle: 'dark',
+        astronomicalBody: 'Earth',
+        elevationActive: false,
+        showDevices: true,
+        showLinks: true,
+        showLabels: true,
+        showDropLines: true,
+        userRotationX: 0.0,
+        userTilt: 0.0,
+        zoomScale: 1.0,
+        verticalExaggeration: 1.0,
+      );
+      const size = Size(800, 600);
+      final center = Offset(400, 300);
+      final double rotationAngle = 0.0;
+      final double tilt = 0.0;
+
+      // Subsurface point facing camera (lat: 0, lng: 0, height < R)
+      final double lat = 0.0;
+      final double lng = 0.0;
+      final double height = 6378137.0 - 5000.0;
+
+      final proj = painter.project(lat, lng, height, center, rotationAngle, tilt, size);
+
+      // Must be culled (z < 0)
+      expect(proj.z, lessThan(0.0));
+    });
+
+    testWidgets('Test Case 4 - Node-to-Overlay Alignment', (WidgetTester tester) async {
+      final camera = VirtualCamera.clamped(
+        latitude: 35.3606,
+        longitude: 138.7274,
+        altitude: 1000.0,
+        heading: 0,
+        pitch: -45,
+        roll: 0,
+      );
+
+      final topologyData = TopologyData(
+        coordinateMapping: const {},
+        nodes: [
+          TopologyNode(
+            id: 'Fuji',
+            label: 'Fuji',
+            position: const TopologyNodePosition(
+              dim0: 138.7274,
+              dim1: 35.3606,
+              dim2: 100.0,
+              timeIndex: 0,
+              vector: [],
+            ),
+            status: 'Active',
+            rawProperties: const {'type': 'ground'},
+          ),
+        ],
+        links: const [],
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Scene3DViewport(
+              camera: camera,
+              topologyData: topologyData,
+              verticalExaggeration: 2.0,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final state = tester.state(find.byType(Scene3DViewport)) as Scene3DViewportState;
+      final Offset projected = state.getProjectedPosition(
+        35.3606,
+        138.7274,
+        altitude: 100.0,
+        nodeType: 'ground',
+      );
+
+      final double latRad = 35.3606 * math.pi / 180.0;
+      final double lngRad = 138.7274 * math.pi / 180.0;
+      final double terrainElev = Scene3DViewportPainter.getElevationStatic(35.3606, 138.7274, true);
+      final double expectedHeight = 6378137.0 + terrainElev * 2.0 + 100.0;
+
+      final Size size = tester.getSize(find.byType(Scene3DViewport));
+      final Offset center = Offset(size.width * 0.45, size.height * 0.5);
+      final double rotationAngle = -(camera.longitude * math.pi / 180.0);
+      final double tilt = -(camera.latitude * math.pi / 180.0);
+
+      final painter = Scene3DViewportPainter(
+        camera: camera,
+        activeStyle: 'Satellite Map',
+        astronomicalBody: 'Earth',
+        elevationActive: true,
+        showDevices: true,
+        showLinks: true,
+        showLabels: true,
+        showDropLines: true,
+        userRotationX: 0.0,
+        userTilt: 0.0,
+        zoomScale: 6378137.0 / camera.altitude,
+        verticalExaggeration: 2.0,
+      );
+
+      final expectedProj = painter.project(
+        latRad,
+        lngRad,
+        expectedHeight,
+        center,
+        rotationAngle,
+        tilt,
+        size,
+      );
+
+      expect(projected, equals(expectedProj.offset));
+    });
+
+    testWidgets('Test Case 5 - Airborne Node Exaggeration', (WidgetTester tester) async {
+      final camera = VirtualCamera.clamped(
+        latitude: 35.3606,
+        longitude: 138.7274,
+        altitude: 1000.0,
+        heading: 0,
+        pitch: -90,
+        roll: 0,
+      );
+
+      final topologyData = TopologyData(
+        coordinateMapping: const {},
+        nodes: [
+          TopologyNode(
+            id: 'Meteor-1',
+            label: 'Meteor-1',
+            position: const TopologyNodePosition(
+              dim0: 138.7274,
+              dim1: 35.3606,
+              dim2: 50000.0,
+              timeIndex: 0,
+              vector: [],
+            ),
+            status: 'Active',
+            rawProperties: const {'type': 'METEOR'},
+          ),
+        ],
+        links: const [],
+      );
+
+      final painter = _TestViewportPainter(
+        camera: camera,
+        elevationActive: true,
+        verticalExaggeration: 10.0,
+        topologyData: topologyData,
+      );
+
+      final canvas = _FakeCanvas();
+      painter.paint(canvas, const Size(800, 600));
+
+      expect(painter.capturedHeights['meteor_group'], isNotNull);
+      expect(painter.capturedHeights['meteor_group']![0], closeTo(6378137.0 + 50000.0, 1e-4));
+    });
   });
 }
 
@@ -463,8 +751,9 @@ class _TestViewportPainter extends Scene3DViewportPainter {
     Offset center,
     double rotationY,
     double tilt,
-    Size size,
-  ) {
+    Size size, {
+    bool clampToHorizon = true,
+  }) {
     final double latDeg = lat * 180.0 / math.pi;
     final double lngDeg = lng * 180.0 / math.pi;
 
@@ -472,7 +761,32 @@ class _TestViewportPainter extends Scene3DViewportPainter {
       capturedHeights.putIfAbsent('point_a_group', () => []).add(height);
     } else if (latDeg.abs() < 1e-3 && lngDeg.abs() < 1e-3) {
       capturedHeights.putIfAbsent('point_c', () => []).add(height);
+    } else if ((latDeg - 35.3606).abs() < 1e-3 && (lngDeg - 138.7274).abs() < 1e-3 && height > 6378137.0 + 40000.0) {
+      capturedHeights.putIfAbsent('meteor_group', () => []).add(height);
     }
-    return super.project(lat, lng, height, center, rotationY, tilt, size);
+    return super.project(lat, lng, height, center, rotationY, tilt, size, clampToHorizon: clampToHorizon);
   }
+}
+
+class _FakeThemeService implements ThemeService {
+  @override
+  Future<ThemeMode> loadThemeMode() async => ThemeMode.system;
+  @override
+  Future<void> saveThemeMode(ThemeMode mode) async {}
+  @override
+  Future<int> loadThemeScheme() async => 0;
+  @override
+  Future<void> saveThemeScheme(int scheme) async {}
+  @override
+  Future<double> loadTextScale() async => 1.0;
+  @override
+  Future<void> saveTextScale(double scale) async {}
+  @override
+  Future<Axis> loadLayoutSplitAxis() async => Axis.vertical;
+  @override
+  Future<void> saveLayoutSplitAxis(Axis axis) async {}
+  @override
+  Future<double> loadPanelOpacity() async => 0.85;
+  @override
+  Future<void> savePanelOpacity(double opacity) async {}
 }
