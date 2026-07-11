@@ -12,6 +12,7 @@
 #include <mutex>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 namespace {
 
@@ -24,6 +25,7 @@ struct BridgeState {
 std::unordered_map<bridge_handle_t, std::shared_ptr<BridgeState>> g_states;
 std::mutex g_statesMutex;
 bridge_handle_t g_nextHandle = 1;
+std::vector<bridge_handle_t> g_freeHandles;
 
 } // namespace
 
@@ -36,8 +38,14 @@ bridge_handle_t bridge_initialize(
 
   try {
     std::lock_guard<std::mutex> lock(g_statesMutex);
-    if (g_nextHandle == INT32_MAX) return BRIDGE_ERR_MEMORY;
-    bridge_handle_t handle = g_nextHandle++;
+    bridge_handle_t handle;
+    if (!g_freeHandles.empty()) {
+      handle = g_freeHandles.back();
+      g_freeHandles.pop_back();
+    } else {
+      if (g_nextHandle == INT32_MAX) return BRIDGE_ERR_MEMORY;
+      handle = g_nextHandle++;
+    }
 
     auto state = std::make_unique<BridgeState>();
     state->errorCallback = on_error;
@@ -60,6 +68,7 @@ void bridge_shutdown(bridge_handle_t handle) {
     if (it != g_states.end()) {
       state = it->second;
       g_states.erase(it);
+      g_freeHandles.push_back(handle);
     }
   }
 }
@@ -67,6 +76,7 @@ void bridge_shutdown(bridge_handle_t handle) {
 int32_t bridge_terminate(void) {
   std::lock_guard<std::mutex> lock(g_statesMutex);
   g_states.clear();
+  g_freeHandles.clear();
   g_nextHandle = 1;
   return BRIDGE_OK;
 }
