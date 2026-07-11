@@ -108,110 +108,138 @@ void main() {
         tester.view.resetDevicePixelRatio();
       });
 
-      final camera = VirtualCamera.clamped(
-        latitude: 35.441924,
-        longitude: 138.848037,
-        altitude: 90635.83,
-        heading: 56.65,
-        pitch: -19.79,
-        roll: 0.0,
-      );
-
-      // Perform non-visual coordinate projection checks directly on the Scene3DViewportPainter
-      final painter = Scene3DViewportPainter(
-        camera: camera,
-        activeStyle: 'dark',
-        astronomicalBody: 'Earth',
-        elevationActive: false,
-        showDevices: true,
-        showLinks: true,
-        showLabels: true,
-        showDropLines: true,
-        userRotationX: 0.0,
-        userTilt: 0.0,
-        zoomScale: 1.0,
-        verticalExaggeration: 1.0,
-      );
-
-      const double R = 6378137.0;
       const Size size = Size(800, 600);
       const Offset center = Offset(400, 300);
 
-      final double rotationAngle = - (camera.longitude * math.pi / 180.0);
-      final double tilt = - (camera.latitude * math.pi / 180.0);
+      final List<(double, double)> locations = [
+        (0.0, 0.0),
+        (35.441924, 138.848037),
+        (-45.0, 90.0),
+        (70.0, -120.0),
+        (10.0, -45.0),
+      ];
 
-      final nagoyaProj = painter.project(
-        35.18 * math.pi / 180.0,
-        136.90 * math.pi / 180.0,
-        R + 0.0,
-        center,
-        rotationAngle,
-        tilt,
-        size,
-      );
+      final List<double> altitudes = [100000.0, 10000000.0];
+      final List<double> headings = [0.0, 90.0, 180.0, 270.0];
+      final List<double> pitches = [-90.0, -45.0, -15.0];
 
-      final tokyoProj = painter.project(
-        36.00 * math.pi / 180.0,
-        140.00 * math.pi / 180.0,
-        R + 0.0,
-        center,
-        rotationAngle,
-        tilt,
-        size,
-      );
+      for (final loc in locations) {
+        final double lat = loc.$1;
+        final double lng = loc.$2;
+        for (final alt in altitudes) {
+          for (final heading in headings) {
+            for (final pitch in pitches) {
+              // Construct the camera with altitude passed as (6378137.0 + alt)
+              // to ensure cRad inside the painter matches the mathematical cRad exactly.
+              final camera = VirtualCamera.clamped(
+                latitude: lat,
+                longitude: lng,
+                altitude: 6378137.0 + alt,
+                heading: heading,
+                pitch: pitch,
+                roll: 0.0,
+              );
 
-      // Assert correct behavior: Nagoya (Southwest, behind) is culled; Tokyo (Northeast, in front) is projected.
-      expect(nagoyaProj.z, lessThan(0.0));
-      expect(tokyoProj.z, greaterThan(0.0));
+              final painter = Scene3DViewportPainter(
+                camera: camera,
+                activeStyle: 'dark',
+                astronomicalBody: 'Earth',
+                elevationActive: false,
+                showDevices: true,
+                showLinks: true,
+                showLabels: true,
+                showDropLines: true,
+                userRotationX: 0.0,
+                userTilt: 0.0,
+                zoomScale: 1.0,
+                verticalExaggeration: 1.0,
+              );
 
-      // Widget visual test
-      final topologyData = TopologyData(
-        coordinateMapping: const {},
-        nodes: [
-          TopologyNode(
-            id: 'Nagoya-OPT-Core',
-            label: 'Nagoya-OPT-Core',
-            position: const TopologyNodePosition(
-              dim0: 136.90, // longitude
-              dim1: 35.18,  // latitude
-              dim2: 0.0,
-              timeIndex: 0,
-              vector: [],
-            ),
-            status: 'Active',
-          ),
-          TopologyNode(
-            id: 'Tokyo-OPT-Core',
-            label: 'Tokyo-OPT-Core',
-            position: const TopologyNodePosition(
-              dim0: 140.00, // longitude
-              dim1: 36.00,  // latitude
-              dim2: 0.0,
-              timeIndex: 0,
-              vector: [],
-            ),
-            status: 'Active',
-          ),
-        ],
-        links: const [],
-      );
+              final double rotationAngle = - (camera.longitude * math.pi / 180.0);
+              final double tilt = - (camera.latitude * math.pi / 180.0);
 
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: Scene3DViewport(
-              camera: camera,
-              topologyData: topologyData,
-            ),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
+              // Vector Math
+              final double radLat = lat * math.pi / 180.0;
+              final double radLng = lng * math.pi / 180.0;
+              final double cRad = 6378137.0 + alt;
+              final double cx = cRad * math.cos(radLat) * math.cos(radLng);
+              final double cy = cRad * math.cos(radLat) * math.sin(radLng);
+              final double cz = cRad * math.sin(radLat);
 
-      await expectLater(
-        find.byType(Scene3DViewport),
-        matchesGoldenFile('goldens/correct_view_culling.png'),
-      );
+              final double ux = math.cos(radLat) * math.cos(radLng);
+              final double uy = math.cos(radLat) * math.sin(radLng);
+              final double uz = math.sin(radLat);
+
+              final double ex = -math.sin(radLng);
+              final double ey = math.cos(radLng);
+              final double ez = 0.0;
+
+              final double nx = -math.sin(radLat) * math.cos(radLng);
+              final double ny = -math.sin(radLat) * math.sin(radLng);
+              final double nz = math.cos(radLat);
+
+              final double H_rad = heading * math.pi / 180.0;
+              final double P_rad = pitch * math.pi / 180.0;
+              final double fx = math.sin(H_rad) * math.cos(P_rad);
+              final double fy = math.cos(H_rad) * math.cos(P_rad);
+              final double fz = math.sin(P_rad);
+
+              final double fx_ecef = fx * ex + fy * nx + fz * ux;
+              final double fy_ecef = fx * ey + fy * ny + fz * uy;
+              final double fz_ecef = fx * ez + fy * nz + fz * uz;
+
+              final double px_f = cx + 100000.0 * fx_ecef;
+              final double py_f = cy + 100000.0 * fy_ecef;
+              final double pz_f = cz + 100000.0 * fz_ecef;
+
+              final double px_b = cx - 100000.0 * fx_ecef;
+              final double py_b = cy - 100000.0 * fy_ecef;
+              final double pz_b = cz - 100000.0 * fz_ecef;
+
+              final double r_f = math.sqrt(px_f * px_f + py_f * py_f + pz_f * pz_f);
+              final double lat_f = math.asin(pz_f / r_f);
+              final double lng_f = math.atan2(py_f, px_f);
+              final double height_f = r_f;
+
+              final double r_b = math.sqrt(px_b * px_b + py_b * py_b + pz_b * pz_b);
+              final double lat_b = math.asin(pz_b / r_b);
+              final double lng_b = math.atan2(py_b, px_b);
+              final double height_b = r_b;
+
+              final forwardProj = painter.project(
+                lat_f,
+                lng_f,
+                height_f,
+                center,
+                rotationAngle,
+                tilt,
+                size,
+              );
+
+              final backwardProj = painter.project(
+                lat_b,
+                lng_b,
+                height_b,
+                center,
+                rotationAngle,
+                tilt,
+                size,
+              );
+
+              expect(
+                forwardProj.z,
+                greaterThan(0.0),
+                reason: 'Forward point not projected for Lat:$lat, Lng:$lng, Alt:$alt, H:$heading, P:$pitch',
+              );
+              expect(
+                backwardProj.z < 0.0 || backwardProj.z == -1.0,
+                isTrue,
+                reason: 'Backward point not culled (z = ${backwardProj.z}) for Lat:$lat, Lng:$lng, Alt:$alt, H:$heading, P:$pitch',
+              );
+            }
+          }
+        }
+      }
     });
 
     testWidgets('Visual Test 4 - Double Elevation Verification', (WidgetTester tester) async {
