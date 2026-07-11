@@ -1190,17 +1190,40 @@ class Scene3DViewportPainter extends CustomPainter {
     final double cy = cRad * math.cos(radLat) * math.sin(radLng);
     final double cz = cRad * math.sin(radLat);
 
-    // 3D ECEF Horizon Culling check
-    final double dotPC = px * cx + py * cy + pz * cz;
-    final bool isCulled = dotPC < R * R;
+    final double d2 = cRad * cRad;
+    final double r2 = R * R;
+
+    bool isCulled = false;
+    {
+      final double cullHeight = math.max(height, R);
+      final double pxCull = cullHeight * math.cos(lat) * math.cos(lng);
+      final double pyCull = cullHeight * math.cos(lat) * math.sin(lng);
+      final double pzCull = cullHeight * math.sin(lat);
+
+      final double rx = pxCull - cx;
+      final double ry = pyCull - cy;
+      final double rz = pzCull - cz;
+      final double dCP2 = rx * rx + ry * ry + rz * rz;
+      final double dotPC = pxCull * cx + pyCull * cy + pzCull * cz;
+
+      if (dotPC < r2) {
+        final double tMin = (d2 - dotPC) / dCP2;
+        if (tMin >= 0.0 && tMin <= 1.0) {
+          final double minDistanceSq = d2 - (d2 - dotPC) * (d2 - dotPC) / dCP2;
+          if (minDistanceSq < r2) {
+            isCulled = true;
+          }
+        }
+      }
+    }
 
     if (isCulled) {
-      final double d2 = cRad * cRad;
       final double r2_over_d2 = (R * R) / d2;
       final double parX = r2_over_d2 * cx;
       final double parY = r2_over_d2 * cy;
       final double parZ = r2_over_d2 * cz;
 
+      final double dotPC = px * cx + py * cy + pz * cz;
       final double dot_over_d2 = dotPC / d2;
       final double perpX = px - dot_over_d2 * cx;
       final double perpY = py - dot_over_d2 * cy;

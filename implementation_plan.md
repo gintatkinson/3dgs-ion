@@ -1,48 +1,58 @@
-# Implementation Plan - Correct Node Classification and Relative Altitude Projection
+# Implementation Plan - Horizon Culling Segment-Intersection & Generic Coordinates
 
-This plan details the changes to fix node classification and relative altitude rendering in the 3D topology scene, including a new visual test case.
+This plan details the changes to implement generic segment-intersection culling math and update the test suite to use domain-independent coordinates.
 
 ## Target Files & Proposed Changes
 
 ### 1. `app_flutter/test/topology/scene_3d_viewport_golden_test.dart`
-- **Add Visual Test 5**:
-  Add `'Visual Test 5 - Correct Ground, Tower, and Satellite Altitude Projection'`.
-  This test instantiates `Scene3DViewportPainter` with `elevationActive: true` and `verticalExaggeration: 10.0`, and passes three nodes:
-  1. `Nagoya` (lat: 35.18, lng: 136.90, alt: 0.0, type: 'ground')
-  2. `Nagoya-Tower` (lat: 35.18, lng: 136.90, alt: 100.0, type: 'ground')
-  3. `Satellite` (lat: 0.0, lng: 0.0, alt: 1000000.0, type: 'space')
-  
-  The test uses a custom subclass of `Scene3DViewportPainter` that overrides `project` to capture the heights passed to the projection function during rendering, and uses a dummy `Canvas` subclass to capture the paint calls.
-  It asserts:
-  - Nagoya is classified as `ground` (asserted by verifying no underwater circles are drawn, and that it is instead drawn as a ground node via `drawPoints`).
-  - Nagoya's geocentric height is exactly `6378137.0 + getElevation(35.18, 136.90) * 10.0`.
-  - Nagoya-Tower's geocentric height is exactly `6378137.0 + getElevation(35.18, 136.90) * 10.0 + 100.0` (verifies tower altitude is not exaggerated).
-  - Satellite's geocentric height is exactly `6378137.0 + 1000000.0` (verifies space altitude is not exaggerated).
+- **Rename Nagoya and Satellite to generic terms**:
+  - Rename `Nagoya` to `PointA` and `Nagoya-Tower` to `PointB` (or `PointA-Tower`).
+  - Rename `Satellite` to `PointC` (representing a space point).
+  - Rename helper variables such as `NagoyaNodeLatRad` -> `PointALatRad`, `NagoyaNodeLngRad` -> `PointALngRad`, `expectedNagoyaHeight` -> `expectedPointAHeight`, `expectedTowerHeight` -> `expectedPointBHeight`.
+  - Rename keys in `capturedHeights` from `nagoya_group` to `point_a_group` and `satellite` to `point_c`.
+  - Rename the description of Visual Test 5 from `'Visual Test 5 - Correct Ground, Tower, and Satellite Altitude Projection'` to `'Visual Test 5 - Correct Ground, Raised Point, and Space Point Altitude Projection'`.
+- **Implement Test 5 directly validating the geocentric radii**:
+  - Ground point height assert: `6378137.0 + terrainElev * verticalExaggeration`.
+  - Raised point height assert: `6378137.0 + terrainElev * verticalExaggeration + 100.0`.
+  - Space point height assert: `6378137.0 + 1000000.0`.
+- **Ensure Visual Test 3 uses ECEF vectors**:
+  - Assert culling results: forward target coordinate (100 km along forward vector) is projected, backward target coordinate (100 km behind camera) is culled.
 
 ### 2. `app_flutter/lib/features/topology/scene_3d_viewport.dart`
-- **Fix 1: Node Classification**:
-  Change line 1759:
-  ```dart
-  final bool isUnderwater = alt <= 10.0;
-  ```
-  to:
-  ```dart
-  final bool isUnderwater = nodeType == 'UNDERWATER' || (nodeType.isEmpty && alt < 0.0) || id.toLowerCase().contains('underwater');
-  ```
+- **Correct segment-intersection horizon culling math**:
+  - Implement segment-intersection check using the new formula:
+    ```dart
+    final double d2 = cRad * cRad;
+    final double r2 = R * R;
+    final double rx = px - cx;
+    final double ry = py - cy;
+    final double rz = pz - cz;
+    final double dCP2 = rx * rx + ry * ry + rz * rz;
+    final double dotPC = px * cx + py * cy + pz * cz;
 
-- **Fix 2: Exaggerated Altitude**:
-  Change line 1810:
-  ```dart
-  finalHeight = 6378137.0 + (terrainElev + alt) * verticalExaggeration;
-  ```
-  to:
-  ```dart
-  finalHeight = 6378137.0 + terrainElev * verticalExaggeration + alt;
-  ```
+    bool isCulled = false;
+    if (dotPC < r2) {
+      final double tMin = (d2 - dotPC) / dCP2;
+      if (tMin >= 0.0 && tMin <= 1.0) {
+        final double minDistanceSq = d2 - (d2 - dotPC) * (d2 - dotPC) / dCP2;
+        if (minDistanceSq < r2) {
+          isCulled = true;
+        }
+      }
+    }
+    ```
+  - For culling checks, compute `px, py, pz` using a clamped height of at least `R = 6378137.0` (i.e. `final double cullHeight = math.max(height, R);`) to prevent shallow subsurface coordinates from being incorrectly culled.
+  - Apply the same culling checks where applicable, preserving the projection of coordinates onto the horizon when culled.
+
+### 3. `app_flutter/test/topology/goldens/stars_and_sphere.png`
+- **Regenerate Golden File**:
+  - Update the golden image to match the corrected horizon culling behavior for climate bands near the WGS84 horizon.
 
 ## Verification Plan
-1. Apply the test changes to `scene_3d_viewport_golden_test.dart`.
-2. Run the test: `flutter test test/topology/scene_3d_viewport_golden_test.dart` to verify that the new Visual Test 5 fails on the buggy codebase (shows that it successfully automates the detection of the defects).
-3. Apply the code fixes to `scene_3d_viewport.dart`.
-4. Run the test suite to confirm that Visual Test 5 and all other tests pass successfully.
-5. Commit and push the changes.
+
+1. **Test Failure Verification**:
+   - Run `flutter test test/topology/scene_3d_viewport_golden_test.dart` after updating the test file but BEFORE the code fix, and verify that the test fails showing correct failure detection.
+2. **Test Success Verification**:
+   - Update goldens on this platform using `flutter test --update-goldens test/topology/scene_3d_viewport_golden_test.dart` and confirm all tests pass successfully.
+3. **Commit & Push**:
+   - Commit all changes and verify `git diff origin/main` is empty.
