@@ -30,6 +30,7 @@ void main() {
         userRotationX: 0.0,
         userTilt: 0.0,
         zoomScale: 1.0,
+        verticalExaggeration: 1.0,
       );
 
       // Node A: on the near surface directly under the camera
@@ -83,6 +84,7 @@ void main() {
         userRotationX: 0.0,
         userTilt: 0.0,
         zoomScale: 1.0,
+        verticalExaggeration: 1.0,
       );
 
       // Node C: high-altitude satellite directly overhead at 20,000 km altitude
@@ -123,6 +125,7 @@ void main() {
         userRotationX: 0.0,
         userTilt: 0.0,
         zoomScale: 1.0,
+        verticalExaggeration: 1.0,
       );
 
       const Size viewportSize = Size(800, 600);
@@ -190,6 +193,7 @@ void main() {
         userRotationX: 0.0,
         userTilt: 0.0,
         zoomScale: 1.0,
+        verticalExaggeration: 1.0,
       );
 
       const Size viewportSize = Size(800, 600);
@@ -227,6 +231,7 @@ void main() {
         userRotationX: 0.0,
         userTilt: 0.0,
         zoomScale: 1.0,
+        verticalExaggeration: 1.0,
       );
       final painterInactive = Scene3DViewportPainter(
         camera: camera,
@@ -240,6 +245,7 @@ void main() {
         userRotationX: 0.0,
         userTilt: 0.0,
         zoomScale: 1.0,
+        verticalExaggeration: 1.0,
       );
 
       // Mount Fuji Peak: 35.3606, 138.7274

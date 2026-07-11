@@ -262,6 +262,7 @@ void main() {
         userRotationX: 0.0,
         userTilt: 0.0,
         zoomScale: 1.0,
+        verticalExaggeration: 1.0,
       );
 
       const double width = 800.0;
@@ -395,6 +396,7 @@ void main() {
                 userRotationX: 0.0,
                 userTilt: 0.0,
                 zoomScale: 1.0,
+                verticalExaggeration: 1.0,
               );
 
               const ui.Size size = ui.Size(800, 600);

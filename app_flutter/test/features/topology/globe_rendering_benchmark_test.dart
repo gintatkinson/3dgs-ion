@@ -90,6 +90,7 @@ void main() {
       userTilt: 0.0,
       zoomScale: 1.0,
       topologyData: topologyData,
+      verticalExaggeration: 1.0,
     );
 
     // 5. Benchmark frame rendering loop (100 frames)
@@ -123,6 +124,7 @@ void main() {
         userTilt: 0.0,
         zoomScale: 1.0,
         topologyData: topologyData,
+        verticalExaggeration: 1.0,
       );
 
       framePainter.paint(canvas, viewportSize);

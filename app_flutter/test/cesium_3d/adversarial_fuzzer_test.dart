@@ -108,6 +108,7 @@ void main() {
             userRotationX: 0.0,
             userTilt: 0.0,
             zoomScale: 1.0,
+            verticalExaggeration: 1.0,
           );
 
           final canvas = FakeCanvas();

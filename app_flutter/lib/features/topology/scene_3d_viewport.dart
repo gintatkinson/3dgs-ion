@@ -18,12 +18,14 @@ class Scene3DViewport extends StatefulWidget {
   final VirtualCamera camera;
   final TopologyData? topologyData;
   final ValueChanged<VirtualCamera>? onCameraChanged;
+  final double verticalExaggeration;
 
   const Scene3DViewport({
     super.key,
     required this.camera,
     this.topologyData,
     this.onCameraChanged,
+    this.verticalExaggeration = 1.0,
   });
 
   /// Initializes the 3D scene rendering state.
@@ -81,6 +83,7 @@ class Scene3DViewportState extends State<Scene3DViewport> {
       zoomScale: zoomScale,
       tileRenderer: _tileRenderer,
       imageryProvider: _providerForStyle(_activeStyle),
+      verticalExaggeration: widget.verticalExaggeration,
     );
 
     final ProjectedPoint projected = painter.project(
@@ -137,7 +140,7 @@ class Scene3DViewportState extends State<Scene3DViewport> {
     super.initState();
     _cameraController = CameraController(widget.camera);
     _cameraController.elevationProvider = (lat, lng) {
-      return Scene3DViewportPainter.getElevationStatic(lat, lng, _elevationActive) * 80.0;
+      return Scene3DViewportPainter.getElevationStatic(lat, lng, _elevationActive) * widget.verticalExaggeration;
     };
     _cameraController.addListener(_onCameraChangedInside);
 
@@ -378,12 +381,13 @@ class Scene3DViewportState extends State<Scene3DViewport> {
       zoomScale: zoomScale,
       tileRenderer: _tileRenderer,
       imageryProvider: _providerForStyle(_activeStyle),
+      verticalExaggeration: widget.verticalExaggeration,
     );
 
     final ProjectedPoint earthCenterProj = painter.project(0.0, 0.0, 0.0, center, 0.0, 0.0, size);
     final Offset projectedCenter = earthCenterProj.offset;
 
-    final double camElevation = _elevationActive ? Scene3DViewportPainter.getElevationStatic(camera.latitude, camera.longitude, true) * 80.0 : 0.0;
+    final double camElevation = _elevationActive ? Scene3DViewportPainter.getElevationStatic(camera.latitude, camera.longitude, true) * widget.verticalExaggeration : 0.0;
     final double cRad = 6378137.0 + camera.altitude + camElevation;
     final double F = size.shortestSide * 1.2;
     final double radDiff1 = cRad * cRad - 6378137.0 * 6378137.0;
@@ -541,6 +545,7 @@ class Scene3DViewportState extends State<Scene3DViewport> {
                     zoomScale: zoomScale,
                     tileRenderer: _tileRenderer,
                     imageryProvider: _providerForStyle(_activeStyle),
+                    verticalExaggeration: widget.verticalExaggeration,
                   ),
                 ),
               ),
@@ -996,6 +1001,7 @@ class Scene3DViewportPainter extends CustomPainter {
   final double zoomScale;
   final GlobeTileRenderer? tileRenderer;
   final ImageryProvider imageryProvider;
+  final double verticalExaggeration;
 
   Scene3DViewportPainter({
     required this.camera,
@@ -1012,6 +1018,7 @@ class Scene3DViewportPainter extends CustomPainter {
     required this.zoomScale,
     this.tileRenderer,
     this.imageryProvider = ImageryProvider.arcGisSatellite,
+    required this.verticalExaggeration,
   });
 
   // Reusable paints to avoid per-iteration allocations in the hot 60fps rendering path.
@@ -1148,7 +1155,7 @@ class Scene3DViewportPainter extends CustomPainter {
     }
 
     // Camera position in ECEF
-    final double camElevation = elevationActive ? getElevation(camera.latitude, camera.longitude) * 80.0 : 0.0;
+    final double camElevation = elevationActive ? getElevation(camera.latitude, camera.longitude) * verticalExaggeration : 0.0;
     final double cRad = R + camera.altitude + camElevation;
     final double cx = cRad * math.cos(radLat) * math.cos(radLng);
     final double cy = cRad * math.cos(radLat) * math.sin(radLng);
@@ -1269,7 +1276,7 @@ class Scene3DViewportPainter extends CustomPainter {
 
   Path _getHorizonPath(Size size, Offset center, double rotationAngle, double tilt) {
     final double R = 6378137.0;
-    final double camElevation = elevationActive ? getElevation(camera.latitude, camera.longitude) * 80.0 : 0.0;
+    final double camElevation = elevationActive ? getElevation(camera.latitude, camera.longitude) * verticalExaggeration : 0.0;
     final double cRad = R + camera.altitude + camElevation;
     final double d2 = cRad * cRad;
 
@@ -1372,7 +1379,7 @@ class Scene3DViewportPainter extends CustomPainter {
     final ProjectedPoint earthCenterProj = project(0.0, 0.0, 0.0, center, 0.0, 0.0, size);
     final Offset projectedCenter = earthCenterProj.offset;
 
-    final double camElevation = elevationActive ? getElevation(camera.latitude, camera.longitude) * 80.0 : 0.0;
+    final double camElevation = elevationActive ? getElevation(camera.latitude, camera.longitude) * verticalExaggeration : 0.0;
     final double cRad = 6378137.0 + camera.altitude + camElevation;
     final double F = size.shortestSide * 1.2;
     final double radDiff = cRad * cRad - 6378137.0 * 6378137.0;
@@ -1606,7 +1613,7 @@ class Scene3DViewportPainter extends CustomPainter {
         6378137.0,
         (double latDeg, double lngDeg) {
           final double elev = getElevation(latDeg, lngDeg);
-          final double ampElev = elev * 80.0;
+          final double ampElev = elev * verticalExaggeration;
           return project(
             _rad(latDeg),
             _rad(lngDeg),
@@ -1763,7 +1770,7 @@ class Scene3DViewportPainter extends CustomPainter {
       double finalHeight = orbitHeight;
       if (type == 'ground' || type == 'underwater') {
         if (elevationActive) {
-          finalHeight = 6378137.0 + alt * 80.0;
+          finalHeight = 6378137.0 + alt * verticalExaggeration;
         } else {
           finalHeight = 6378137.0 + alt;
         }
@@ -1776,7 +1783,7 @@ class Scene3DViewportPainter extends CustomPainter {
         // Draw vertical drop line from satellite to surface
         if (type == 'space' && showDropLines) {
           final double terrainElev = getElevation(latDeg, currentLng * 180.0 / math.pi);
-          final double surfaceHeight = 6378137.0 + terrainElev * 80.0;
+          final double surfaceHeight = 6378137.0 + terrainElev * verticalExaggeration;
           final surfaceProj = project(lat, currentLng, surfaceHeight, center, rotationAngle, tilt, size);
 
           const int dashes = 10;
