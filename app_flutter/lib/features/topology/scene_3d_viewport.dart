@@ -58,7 +58,15 @@ class Scene3DViewportState extends State<Scene3DViewport> {
     final Size? size = context.size;
     if (size == null) return Offset.zero;
 
-    final camera = _cameraController.current;
+    final rawCamera = _cameraController.current;
+    final camera = rawCamera.altitude < 6378137.0 ? VirtualCamera.raw(
+      latitude: rawCamera.latitude,
+      longitude: rawCamera.longitude,
+      altitude: 6378137.0 + rawCamera.altitude,
+      heading: rawCamera.heading,
+      pitch: rawCamera.pitch,
+      roll: rawCamera.roll,
+    ) : rawCamera;
     final double zoomScale = 6378137.0 / camera.altitude;
     final Offset center = Offset(size.width * 0.45, size.height * 0.5);
 
@@ -138,7 +146,16 @@ class Scene3DViewportState extends State<Scene3DViewport> {
   @override
   void initState() {
     super.initState();
-    _cameraController = CameraController(widget.camera);
+    final rawCamInit = widget.camera;
+    final absCamInit = rawCamInit.altitude < 6378137.0 ? VirtualCamera.raw(
+      latitude: rawCamInit.latitude,
+      longitude: rawCamInit.longitude,
+      altitude: 6378137.0 + rawCamInit.altitude,
+      heading: rawCamInit.heading,
+      pitch: rawCamInit.pitch,
+      roll: rawCamInit.roll,
+    ) : rawCamInit;
+    _cameraController = CameraController(absCamInit);
     _cameraController.elevationProvider = (lat, lng) {
       return Scene3DViewportPainter.getElevationStatic(lat, lng, _elevationActive) * widget.verticalExaggeration;
     };
@@ -172,7 +189,16 @@ class Scene3DViewportState extends State<Scene3DViewport> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.camera != widget.camera) {
       _isUpdatingWidget = true;
-      _cameraController.updateCamera(widget.camera);
+      final rawCamUpdate = widget.camera;
+      final absCamUpdate = rawCamUpdate.altitude < 6378137.0 ? VirtualCamera.raw(
+        latitude: rawCamUpdate.latitude,
+        longitude: rawCamUpdate.longitude,
+        altitude: 6378137.0 + rawCamUpdate.altitude,
+        heading: rawCamUpdate.heading,
+        pitch: rawCamUpdate.pitch,
+        roll: rawCamUpdate.roll,
+      ) : rawCamUpdate;
+      _cameraController.updateCamera(absCamUpdate);
       _isUpdatingWidget = false;
     }
   }
@@ -362,7 +388,15 @@ class Scene3DViewportState extends State<Scene3DViewport> {
   }
 
   VirtualCamera? _clickToCamera(Offset localPosition, Size size) {
-    final camera = _cameraController.current;
+    final rawCamera = _cameraController.current;
+    final camera = rawCamera.altitude < 6378137.0 ? VirtualCamera.raw(
+      latitude: rawCamera.latitude,
+      longitude: rawCamera.longitude,
+      altitude: 6378137.0 + rawCamera.altitude,
+      heading: rawCamera.heading,
+      pitch: rawCamera.pitch,
+      roll: rawCamera.roll,
+    ) : rawCamera;
     final double zoomScale = 6378137.0 / camera.altitude;
     final Offset center = Offset(size.width * 0.45, size.height * 0.5);
 
@@ -388,7 +422,7 @@ class Scene3DViewportState extends State<Scene3DViewport> {
     final Offset projectedCenter = earthCenterProj.offset;
 
     final double camElevation = _elevationActive ? Scene3DViewportPainter.getElevationStatic(camera.latitude, camera.longitude, true) * widget.verticalExaggeration : 0.0;
-    final double cRad = 6378137.0 + camera.altitude + camElevation;
+    final double cRad = camera.altitude + camElevation;
     final double F = size.shortestSide * 1.2;
     final double radDiff1 = cRad * cRad - 6378137.0 * 6378137.0;
     final double projectedRadius = 6378137.0 * F / math.sqrt(radDiff1 <= 0.0 ? 1.0 : radDiff1);
@@ -440,7 +474,9 @@ class Scene3DViewportState extends State<Scene3DViewport> {
 
   @override
   Widget build(BuildContext context) {
-    final zoomScale = 6378137.0 / _cameraController.current.altitude;
+    final rawCamera = _cameraController.current;
+    final double buildAlt = rawCamera.altitude < 6378137.0 ? 6378137.0 + rawCamera.altitude : rawCamera.altitude;
+    final zoomScale = 6378137.0 / buildAlt;
     return Focus(
       focusNode: _globeFocusNode,
       autofocus: true,
@@ -622,7 +658,7 @@ class Scene3DViewportState extends State<Scene3DViewport> {
                             ),
                           ),
                           Text(
-                            'Altitude: ${_cameraController.current.altitude} meters',
+                            'Altitude: ${(_cameraController.current.altitude - 6378137.0).toStringAsFixed(2)} meters',
                             style: const TextStyle(
                               color: Color(0xFFE0E0E0),
                               fontFamily: 'monospace',
@@ -1004,7 +1040,7 @@ class Scene3DViewportPainter extends CustomPainter {
   final double verticalExaggeration;
 
   Scene3DViewportPainter({
-    required this.camera,
+    required VirtualCamera camera,
     required this.activeStyle,
     required this.astronomicalBody,
     required this.elevationActive,
@@ -1019,7 +1055,14 @@ class Scene3DViewportPainter extends CustomPainter {
     this.tileRenderer,
     this.imageryProvider = ImageryProvider.arcGisSatellite,
     required this.verticalExaggeration,
-  });
+  }) : camera = camera.altitude < 6378137.0 ? VirtualCamera.raw(
+         latitude: camera.latitude,
+         longitude: camera.longitude,
+         altitude: 6378137.0 + camera.altitude,
+         heading: camera.heading,
+         pitch: camera.pitch,
+         roll: camera.roll,
+       ) : camera;
 
   // Reusable paints to avoid per-iteration allocations in the hot 60fps rendering path.
   late final Paint _starPaint = Paint()..style = PaintingStyle.fill;
@@ -1156,7 +1199,7 @@ class Scene3DViewportPainter extends CustomPainter {
 
     // Camera position in ECEF
     final double camElevation = elevationActive ? getElevation(camera.latitude, camera.longitude) * verticalExaggeration : 0.0;
-    final double cRad = R + camera.altitude + camElevation;
+    final double cRad = camera.altitude + camElevation;
     final double cx = cRad * math.cos(radLat) * math.cos(radLng);
     final double cy = cRad * math.cos(radLat) * math.sin(radLng);
     final double cz = cRad * math.sin(radLat);
@@ -1277,7 +1320,7 @@ class Scene3DViewportPainter extends CustomPainter {
   Path _getHorizonPath(Size size, Offset center, double rotationAngle, double tilt) {
     final double R = 6378137.0;
     final double camElevation = elevationActive ? getElevation(camera.latitude, camera.longitude) * verticalExaggeration : 0.0;
-    final double cRad = R + camera.altitude + camElevation;
+    final double cRad = camera.altitude + camElevation;
     final double d2 = cRad * cRad;
 
     final double radLng = -rotationAngle;
@@ -1380,7 +1423,7 @@ class Scene3DViewportPainter extends CustomPainter {
     final Offset projectedCenter = earthCenterProj.offset;
 
     final double camElevation = elevationActive ? getElevation(camera.latitude, camera.longitude) * verticalExaggeration : 0.0;
-    final double cRad = 6378137.0 + camera.altitude + camElevation;
+    final double cRad = camera.altitude + camElevation;
     final double F = size.shortestSide * 1.2;
     final double radDiff = cRad * cRad - 6378137.0 * 6378137.0;
     final double projectedRadius = 6378137.0 * F / math.sqrt(radDiff <= 0.0 ? 1.0 : radDiff);
@@ -1770,7 +1813,8 @@ class Scene3DViewportPainter extends CustomPainter {
       double finalHeight = orbitHeight;
       if (type == 'ground' || type == 'underwater') {
         if (elevationActive) {
-          finalHeight = 6378137.0 + alt * verticalExaggeration;
+          final double terrainElev = getElevation(latDeg, currentLng * 180.0 / math.pi);
+          finalHeight = 6378137.0 + (terrainElev + alt) * verticalExaggeration;
         } else {
           finalHeight = 6378137.0 + alt;
         }

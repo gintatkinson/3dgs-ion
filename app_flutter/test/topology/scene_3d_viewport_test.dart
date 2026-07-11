@@ -107,7 +107,7 @@ void main() {
       final camera = VirtualCamera.clamped(
         latitude: 0.0,
         longitude: 0.0,
-        altitude: 10000000.0, // 10,000 km altitude
+        altitude: 6378137.0 + 10000000.0, // 10,000 km altitude
         heading: 0,
         pitch: -45, // Tilted camera (not looking straight down)
         roll: 0,
@@ -158,7 +158,7 @@ void main() {
       final double dy = culledPointProj.offset.dy - projectedCenter.dy;
       final double distanceToProjectedCenter = math.sqrt(dx * dx + dy * dy);
 
-      final double cRad = R + camera.altitude;
+      final double cRad = camera.altitude;
       final double F = viewportSize.shortestSide * 1.2;
       final double radDiff = cRad * cRad - R * R;
       final double expectedProjectedRadius = R * F / math.sqrt(radDiff <= 0.0 ? 1.0 : radDiff);

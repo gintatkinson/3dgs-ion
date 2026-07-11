@@ -453,7 +453,7 @@ void main() {
 
         expect(controller.current.latitude, -75.0);
         expect(controller.current.longitude, 50.0);
-        expect(controller.current.altitude, 500.0);
+        expect(controller.current.altitude, 6378137.0 + 500.0);
         expect(controller.current.heading, 0.0);
         expect(controller.current.pitch, -89.9);
       });

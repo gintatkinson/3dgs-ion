@@ -28,7 +28,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // Verify initial altitude HUD
-    expect(find.textContaining('Altitude: 10000.0 meters'), findsOneWidget);
+    expect(find.textContaining('Altitude: 10000.00 meters'), findsOneWidget);
 
     // Simulate scroll zoom in (negative dy)
     final viewportFinder = find.byType(Scene3DViewport);
@@ -43,9 +43,9 @@ void main() {
     final state = tester.state(find.byType(Scene3DViewport)) as dynamic;
     final CameraController controller = state.cameraController as CameraController;
 
-    expect(controller.current.altitude, lessThan(10000.0));
+    expect(controller.current.altitude, lessThan(6378137.0 + 10000.0));
 
     // Verify HUD text is updated and does not display the old altitude value
-    expect(find.textContaining('Altitude: 10000.0 meters'), findsNothing);
+    expect(find.textContaining('Altitude: 10000.00 meters'), findsNothing);
   });
 }

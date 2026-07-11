@@ -149,13 +149,14 @@ class GlobeTileRenderer {
   /// (16 tiles) is then generated around it, clamped to valid Web Mercator
   /// bounds.
   List<TileCoord> _visibleTiles(VirtualCamera camera, ui.Size viewportSize) {
-    final zoom = _zoomForAltitude(camera.altitude, viewportSize.width);
+    final double R = 6378137.0;
+    final double relativeAlt = camera.altitude < R ? camera.altitude : camera.altitude - R;
+    final zoom = _zoomForAltitude(relativeAlt, viewportSize.width);
     final center = _latLngToTile(camera.latitude, camera.longitude, zoom);
     final List<TileCoord> tiles = [];
 
     // Horizon angle theta = acos(R / (R + h)) where R = 6378137.0
-    final double R = 6378137.0;
-    final double h = camera.altitude;
+    final double h = relativeAlt < 0.1 ? 0.1 : relativeAlt;
     final double theta = math.acos(R / (R + h));
 
     // Tier 1: Zoom 2 (global background coverage)
