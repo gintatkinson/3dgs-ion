@@ -421,8 +421,7 @@ class Scene3DViewportState extends State<Scene3DViewport> {
     final ProjectedPoint earthCenterProj = painter.project(0.0, 0.0, 0.0, center, 0.0, 0.0, size);
     final Offset projectedCenter = earthCenterProj.offset;
 
-    final double camElevation = _elevationActive ? Scene3DViewportPainter.getElevationStatic(camera.latitude, camera.longitude, true) * widget.verticalExaggeration : 0.0;
-    final double cRad = camera.altitude + camElevation;
+    final double cRad = camera.altitude;
     final double F = size.shortestSide * 1.2;
     final double radDiff1 = cRad * cRad - 6378137.0 * 6378137.0;
     final double projectedRadius = 6378137.0 * F / math.sqrt(radDiff1 <= 0.0 ? 1.0 : radDiff1);
@@ -1198,8 +1197,7 @@ class Scene3DViewportPainter extends CustomPainter {
     }
 
     // Camera position in ECEF
-    final double camElevation = elevationActive ? getElevation(camera.latitude, camera.longitude) * verticalExaggeration : 0.0;
-    final double cRad = camera.altitude + camElevation;
+    final double cRad = camera.altitude;
     final double cx = cRad * math.cos(radLat) * math.cos(radLng);
     final double cy = cRad * math.cos(radLat) * math.sin(radLng);
     final double cz = cRad * math.sin(radLat);
@@ -1319,8 +1317,7 @@ class Scene3DViewportPainter extends CustomPainter {
 
   Path _getHorizonPath(Size size, Offset center, double rotationAngle, double tilt) {
     final double R = 6378137.0;
-    final double camElevation = elevationActive ? getElevation(camera.latitude, camera.longitude) * verticalExaggeration : 0.0;
-    final double cRad = camera.altitude + camElevation;
+    final double cRad = camera.altitude;
     final double d2 = cRad * cRad;
 
     final double radLng = -rotationAngle;
@@ -1422,8 +1419,7 @@ class Scene3DViewportPainter extends CustomPainter {
     final ProjectedPoint earthCenterProj = project(0.0, 0.0, 0.0, center, 0.0, 0.0, size);
     final Offset projectedCenter = earthCenterProj.offset;
 
-    final double camElevation = elevationActive ? getElevation(camera.latitude, camera.longitude) * verticalExaggeration : 0.0;
-    final double cRad = camera.altitude + camElevation;
+    final double cRad = camera.altitude;
     final double F = size.shortestSide * 1.2;
     final double radDiff = cRad * cRad - 6378137.0 * 6378137.0;
     final double projectedRadius = 6378137.0 * F / math.sqrt(radDiff <= 0.0 ? 1.0 : radDiff);

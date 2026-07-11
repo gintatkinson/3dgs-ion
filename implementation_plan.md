@@ -137,11 +137,55 @@ This plan details the surgical changes to implement ECEF scroll-zoom math correc
   - Line 209: `expect(c.current.altitude, equals(6378137.0 + CameraController.minAltitude));`
   - Line 215: `expect(c.current.altitude, equals(6378137.0 + CameraController.maxAltitude));`
 
+### 5. `app_flutter/lib/features/topology/scene_3d_viewport.dart`
+- Surgically modify the file to replace the 4 occurrences of `cRad` calculation:
+  - Occurrence 1 (hitTest, lines 424-425):
+    Replace:
+    ```dart
+    final double camElevation = _elevationActive ? Scene3DViewportPainter.getElevationStatic(camera.latitude, camera.longitude, true) * widget.verticalExaggeration : 0.0;
+    final double cRad = camera.altitude + camElevation;
+    ```
+    with:
+    ```dart
+    final double cRad = camera.altitude;
+    ```
+  - Occurrence 2 (project, lines 1201-1202):
+    Replace:
+    ```dart
+    final double camElevation = elevationActive ? getElevation(camera.latitude, camera.longitude) * verticalExaggeration : 0.0;
+    final double cRad = camera.altitude + camElevation;
+    ```
+    with:
+    ```dart
+    final double cRad = camera.altitude;
+    ```
+  - Occurrence 3 (_getHorizonPath, lines 1322-1323):
+    Replace:
+    ```dart
+    final double camElevation = elevationActive ? getElevation(camera.latitude, camera.longitude) * verticalExaggeration : 0.0;
+    final double cRad = camera.altitude + camElevation;
+    ```
+    with:
+    ```dart
+    final double cRad = camera.altitude;
+    ```
+  - Occurrence 4 (paint, lines 1425-1426):
+    Replace:
+    ```dart
+    final double camElevation = elevationActive ? getElevation(camera.latitude, camera.longitude) * verticalExaggeration : 0.0;
+    final double cRad = camera.altitude + camElevation;
+    ```
+    with:
+    ```dart
+    final double cRad = camera.altitude;
+    ```
+
 ## Verification Plan
 
 - Run the flutter tests:
-  `flutter test test/cesium_3d/camera_collision_test.dart test/topology/scroll_zoom_test.dart test/cesium_3d/camera_controller_test.dart`
+  `flutter test`
 - Ensure all tests pass.
 - Verify `git diff origin/main` matches expectations and there are no extraneous changes.
 - Push and check remote sync.
+
 
